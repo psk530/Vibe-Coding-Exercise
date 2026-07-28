@@ -1,0 +1,689 @@
+﻿<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>US TV Market - Brand Competition Dashboard</title>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/prop-types@15/prop-types.min.js"></script>
+<script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+:root{
+  --c-red:#A5023D;      /* deep burgundy - primary accent */
+  --c-pink:#FCEBEF;     /* pale pink - accent tint / soft backgrounds */
+  --c-gray-dark:#6E6E6E;/* charcoal - secondary text */
+  --c-gray-light:#EAEAEA;/* light gray - borders/dividers */
+  --c-brown:#47422E;    /* dark olive-brown - primary text */
+  --c-olive:#9C9160;    /* olive gold - secondary accent / muted labels */
+  --c-khaki:#C7BD91;    /* light khaki - tertiary divider/accent */
+  --c-cream:#DEDAC1;    /* pale cream - page background */
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--c-cream);color:var(--c-brown);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:14px;line-height:1.5}
+#root{min-height:100vh;padding:24px 28px;max-width:1440px;margin:0 auto}
+.header{margin-bottom:18px;padding-bottom:16px;border-bottom:1px solid var(--c-khaki);display:flex;align-items:center;gap:12px}
+.header-badge{width:34px;height:34px;border-radius:9px;background:var(--c-red);color:#fff;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;letter-spacing:-0.5px}
+.header h1{font-size:19px;font-weight:700;color:var(--c-brown)}
+.header p{font-size:12px;color:var(--c-gray-dark);margin-top:3px}
+.filters{background:#fff;border:1px solid var(--c-gray-light);border-radius:12px;padding:14px 20px;margin-bottom:16px;display:flex;flex-wrap:wrap;gap:20px;align-items:flex-end;box-shadow:0 1px 2px rgba(71,66,46,.06)}
+.filter-group{display:flex;flex-direction:column;gap:6px}
+.filter-label{font-size:11px;color:var(--c-olive);text-transform:uppercase;letter-spacing:0.5px;font-weight:600}
+.filter-select{background:#fff;border:1px solid var(--c-gray-light);color:var(--c-brown);border-radius:8px;padding:6px 12px;font-size:13px;cursor:pointer;outline:none}
+.filter-select:focus{border-color:var(--c-red)}
+.brand-pills{display:flex;flex-wrap:wrap;gap:6px}
+.brand-pill{padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid;transition:all 0.15s;opacity:0.4;background:#fff}
+.brand-pill.active{opacity:1}
+.select-all-pill{padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px dashed var(--c-olive);color:var(--c-gray-dark);background:var(--c-pink);flex-shrink:0;transition:background 0.15s}
+.select-all-pill:hover{background:#f8dde4}
+.insight-item{font-size:13px;line-height:1.6;color:var(--c-brown);padding-left:14px;position:relative}
+.insight-item::before{content:'';position:absolute;left:0;top:8px;width:5px;height:5px;border-radius:50%;background:var(--c-red)}
+.chart-header-insight{font-size:12px;color:var(--c-gray-dark);text-align:left;line-height:1.5;font-style:italic}
+.hl{color:#1B8A2E;font-weight:700}
+.insight-summary-badge{display:inline-block;background:var(--c-red);color:#fff;padding:6px 16px;border-radius:7px;font-size:14px;font-weight:800;letter-spacing:.3px}
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px}
+.kpi-card{background:#fff;border-radius:12px;padding:16px 18px;border:1px solid var(--c-gray-light);box-shadow:0 1px 2px rgba(71,66,46,.06)}
+.kpi-label{font-size:11px;color:var(--c-olive);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;font-weight:600;display:flex;align-items:center;gap:6px}
+.kpi-value{font-size:22px;font-weight:700;color:var(--c-brown)}
+.kpi-sub{font-size:12px;color:var(--c-gray-dark);margin-top:3px}
+.charts-grid-2{display:grid;grid-template-columns:5fr 5fr;gap:14px;margin-bottom:14px}
+.charts-grid-1{display:grid;grid-template-columns:1fr;margin-bottom:14px}
+.chart-card{background:#fff;border-radius:12px;padding:18px 20px;border:1px solid var(--c-gray-light);box-shadow:0 1px 2px rgba(71,66,46,.06)}
+.chart-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px}
+.chart-title{font-size:14px;font-weight:700;color:var(--c-brown);display:flex;align-items:center;gap:8px}
+.chart-subtitle{font-size:11px;color:var(--c-gray-dark);margin-top:2px;margin-left:26px}
+.num-badge{width:18px;height:18px;border-radius:50%;background:var(--c-red);color:#fff;font-size:10px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+.toggle-group{display:flex;background:var(--c-pink);border-radius:8px;border:1px solid var(--c-gray-light);overflow:hidden;flex-shrink:0}
+.toggle-btn{padding:4px 12px;font-size:12px;cursor:pointer;background:transparent;border:none;color:var(--c-gray-dark);transition:all 0.15s;font-weight:600}
+.toggle-btn.active{background:var(--c-red);color:#fff}
+.ctt{background:#fff;border:1px solid var(--c-gray-light);border-radius:8px;padding:10px 14px;font-size:12px;min-width:160px;box-shadow:0 4px 12px rgba(71,66,46,.12)}
+.ctt-label{color:var(--c-gray-dark);margin-bottom:6px;font-size:11px;font-weight:600}
+.ctt-item{display:flex;align-items:center;gap:7px;margin:3px 0}
+.ctt-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.ctt-name{color:var(--c-gray-dark);flex:1}
+.ctt-val{color:var(--c-brown);font-weight:600}
+@media(max-width:900px){.kpi-grid{grid-template-columns:repeat(2,1fr)}.charts-grid-2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+const BRANDS=['Samsung','LG','TCL','Insignia','HiSense','Amazon','Sony','Roku','Vizio','Toshiba'];
+const COLORS=['#9c0037','#dc496a','#a80b41','#e95674','#b5204b','#f6627f','#c22f55','#ff6e8a','#cf3d5f','#ff7a95'];
+const DASHES=['0','6 3','2 3','9 3 2 3','1 3','6 3 2 3','2 5','9 3','4 2','1 5'];
+
+</script>
+<script type="text/babel">
+const {useState,useMemo,useEffect}=React;
+const {LineChart,Line,BarChart,Bar,PieChart,Pie,Cell,XAxis,YAxis,CartesianGrid,Tooltip,Legend,ResponsiveContainer,LabelList,ReferenceDot}=Recharts;
+
+const fmtM=n=>`$${(n/1e6).toFixed(1)}M`;
+const fmtK=n=>n>=1e6?`${(n/1e6).toFixed(1)}M`:n>=1e3?`${(n/1e3).toFixed(0)}K`:String(n);
+const fmtPct=n=>`${n.toFixed(1)}%`;
+
+function pearson(xs,ys){
+  const n=xs.length;
+  if(n<3) return null;
+  const mx=xs.reduce((a,b)=>a+b,0)/n, my=ys.reduce((a,b)=>a+b,0)/n;
+  let num=0,dx2=0,dy2=0;
+  for(let i=0;i<n;i++){ const dx=xs[i]-mx, dy=ys[i]-my; num+=dx*dy; dx2+=dx*dx; dy2+=dy*dy; }
+  const den=Math.sqrt(dx2*dy2);
+  return den?num/den:0;
+}
+function corrDesc(r){
+  const abs=Math.abs(r);
+  const strength=abs>=0.7?'강한':abs>=0.4?'뚜렷한':abs>=0.2?'약한':'거의 없는';
+  const dir=r>=0?'양':'음';
+  return {strength,dir,abs};
+}
+const T_CRIT_05={1:12.706,2:4.303,3:3.182,4:2.776,5:2.571,6:2.447,7:2.365,8:2.306,9:2.262,10:2.228};
+function corrSignificant(r,n){
+  if(r==null||n<3) return false;
+  const df=n-2;
+  if(df<1) return false;
+  if(Math.abs(r)>=0.999) return true;
+  const t=Math.abs(r)*Math.sqrt(df/(1-r*r));
+  const crit=T_CRIT_05[df]||1.96;
+  return t>crit;
+}
+
+function extremeBarLabel(data,formatter){
+  return (props)=>{
+    const {x,y,width,height,value,index}=props;
+    if(index!==0 && index!==data.length-1) return null;
+    const cy=y+height/2;
+    return (
+      <text x={x+width+6} y={cy} dy={4} fontSize={11} fontWeight={700} fill="var(--c-brown)" textAnchor="start">
+        {formatter(value)}
+      </text>
+    );
+  };
+}
+
+function weekToLabel(w){
+  const yr=Math.floor(w/100);
+  const wk=w%100;
+  const mo=Math.min(Math.ceil(wk/4.33),12);
+  const ms=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${String(yr).slice(2)}-${ms[mo-1]}`;
+}
+
+function buildTrendData(weekly, selectedBrands, period){
+  const map={};
+  for(const row of weekly){
+    const {week:wk,brand:b,rev,units}=row;
+    const yr=Math.floor(wk/100);
+    if(period!=='all' && yr!==parseInt(period)) continue;
+    if(!selectedBrands.includes(b)) continue;
+    const key=weekToLabel(wk);
+    if(!map[key]) map[key]={label:key,_wk:wk};
+    map[key][b]=(map[key][b]||0)+rev;
+    map[key][b+'_u']=(map[key][b+'_u']||0)+units;
+  }
+  return Object.values(map).sort((a,b)=>a._wk-b._wk);
+}
+
+function CustomTooltip({active,payload,label,metric}){
+  if(!active||!payload||!payload.length) return null;
+  const items=[...payload].sort((a,b)=>b.value-a.value);
+  return (
+    <div className="ctt">
+      <div className="ctt-label">{label}</div>
+      {items.map(p=>(
+        <div key={p.name} className="ctt-item">
+          <div className="ctt-dot" style={{background:p.color}}/>
+          <span className="ctt-name">{p.name}</span>
+          <span className="ctt-val">{metric==='rev'?fmtM(p.value):fmtK(p.value)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function BarLegend({data}){
+  return (
+    <div style={{display:'flex',flexWrap:'wrap',gap:'4px 12px',marginTop:10,paddingTop:10,borderTop:'1px solid var(--c-gray-light)'}}>
+      {data.map(d=>(
+        <div key={d.brand} style={{display:'flex',alignItems:'center',gap:5}}>
+          <div style={{width:8,height:8,borderRadius:'50%',background:d.color,flexShrink:0}}/>
+          <span style={{fontSize:11,color:'var(--c-gray-dark)'}}>{d.brand}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function CustomPieTooltip({active,payload}){
+  if(!active||!payload||!payload.length) return null;
+  const d=payload[0];
+  return(
+    <div className="ctt">
+      <div className="ctt-item">
+        <div className="ctt-dot" style={{background:d.payload.fill}}/>
+        <span className="ctt-name">{d.name}</span>
+        <span className="ctt-val">{fmtM(d.value)}</span>
+      </div>
+      <div style={{color:'var(--c-gray-dark)',marginTop:4}}>{fmtPct(d.payload.pct)} share</div>
+    </div>
+  );
+}
+
+function Dashboard(){
+  const [sel,setSel]=useState(new Set(BRANDS));
+  const [period,setPeriod]=useState('all');
+  const [metric,setMetric]=useState('rev');
+  const [weekly,setWeekly]=useState(null);
+  const [totals,setTotals]=useState(null);
+  const [loadError,setLoadError]=useState(null);
+
+  useEffect(()=>{
+    Promise.all([
+      fetch('/api/weekly').then(r=>{if(!r.ok) throw new Error('weekly '+r.status); return r.json();}),
+      fetch('/api/totals').then(r=>{if(!r.ok) throw new Error('totals '+r.status); return r.json();}),
+    ]).then(([w,t])=>{setWeekly(w);setTotals(t);})
+      .catch(e=>setLoadError(e.message));
+  },[]);
+
+  const toggle=b=>setSel(prev=>{
+    const n=new Set(prev);
+    if(n.has(b)){if(n.size>1)n.delete(b);}else n.add(b);
+    return n;
+  });
+
+  const allSelected=sel.size===BRANDS.length;
+  const toggleAll=()=>setSel(allSelected?new Set():new Set(BRANDS));
+
+  const filteredTotals=useMemo(()=>{
+    if(!weekly||!totals) return [];
+    if(period==='all') return totals.filter(t=>sel.has(t.brand));
+    const byBrand={};
+    for(const row of weekly){
+      const {week:wk,brand:b,rev,units,traffic}=row;
+      const yr=Math.floor(wk/100);
+      if(yr!==parseInt(period)) continue;
+      if(!sel.has(b)) continue;
+      if(!byBrand[b]) byBrand[b]={brand:b,rev:0,units:0,traffic:0,conv:0};
+      byBrand[b].rev+=rev;
+      byBrand[b].units+=units;
+      byBrand[b].traffic+=traffic;
+    }
+    return Object.values(byBrand).map(t=>({...t,conv:t.traffic?t.units/t.traffic*100:0}));
+  },[weekly,totals,sel,period]);
+
+  const totalRev=filteredTotals.reduce((s,t)=>s+t.rev,0);
+  const totalUnits=filteredTotals.reduce((s,t)=>s+t.units,0);
+
+  const pieData=useMemo(()=>{
+    const sorted=[...filteredTotals].sort((a,b)=>b[metric==='rev'?'rev':'units']-a[metric==='rev'?'rev':'units']);
+    const val=metric==='rev'?'rev':'units';
+    const total=sorted.reduce((s,t)=>s+t[val],0);
+    return sorted.map(t=>({name:t.brand,value:t[val],pct:total?t[val]/total*100:0,fill:COLORS[BRANDS.indexOf(t.brand)]}));
+  },[filteredTotals,metric]);
+
+  const barData=useMemo(()=>{
+    return [...filteredTotals].sort((a,b)=>b[metric==='rev'?'rev':'units']-a[metric==='rev'?'rev':'units'])
+      .map(t=>({brand:t.brand,value:t[metric==='rev'?'rev':'units'],color:COLORS[BRANDS.indexOf(t.brand)]}));
+  },[filteredTotals,metric]);
+
+  const trendData=useMemo(()=>weekly?buildTrendData(weekly,[...sel],period):[],[weekly,sel,period]);
+
+  const trendPeak=useMemo(()=>{
+    if(!trendData.length) return null;
+    let best=null;
+    for(const row of trendData){
+      let sum=0;
+      for(const b of sel){ sum+=row[metric==='rev'?b:b+'_u']||0; }
+      if(!best||sum>best.sum) best={label:row.label,sum};
+    }
+    return best;
+  },[trendData,sel,metric]);
+
+  const trendGlobalMax=useMemo(()=>{
+    if(!trendData.length) return null;
+    let best=null;
+    for(const row of trendData){
+      for(const b of sel){
+        const key=metric==='rev'?b:b+'_u';
+        const v=row[key];
+        if(v==null) continue;
+        if(!best||v>best.value) best={label:row.label,value:v,brand:b};
+      }
+    }
+    return best;
+  },[trendData,sel,metric]);
+
+  const rankedByRev=useMemo(()=>[...filteredTotals].sort((a,b)=>b.rev-a.rev),[filteredTotals]);
+  const topBrand=rankedByRev[0]||null;
+  const secondBrand=rankedByRev[1]||null;
+  const gapRev=(topBrand&&secondBrand)?topBrand.rev-secondBrand.rev:0;
+  const allTotals=(totals||[]).filter(t=>sel.has(t.brand));
+  const avgConv=allTotals.length?allTotals.reduce((s,t)=>s+t.conv,0)/allTotals.length:0;
+
+  const trendKey=metric==='rev'?'rev':'_u';
+
+  const yoy=useMemo(()=>{
+    if(!weekly) return null;
+    const years=[...new Set(weekly.map(r=>Math.floor(r.week/100)))];
+    const maxYear=Math.max(...years);
+    const curYear=period==='all'?maxYear:parseInt(period);
+    const priorYear=curYear-1;
+    if(!years.includes(priorYear)) return null;
+    const curWeekNos=new Set(weekly.filter(r=>Math.floor(r.week/100)===curYear).map(r=>r.week%100));
+    const sums=yr=>{
+      let rev=0,units=0,traffic=0;
+      for(const r of weekly){
+        if(Math.floor(r.week/100)!==yr) continue;
+        if(!curWeekNos.has(r.week%100)) continue;
+        if(!sel.has(r.brand)) continue;
+        rev+=r.rev; units+=r.units; traffic+=r.traffic;
+      }
+      return {rev,units,traffic,conv:traffic?units/traffic*100:0};
+    };
+    const cur=sums(curYear), prior=sums(priorYear);
+    if(!prior.rev&&!prior.units) return null;
+    return {
+      curYear,priorYear,
+      revPct:prior.rev?(cur.rev-prior.rev)/prior.rev*100:null,
+      unitsPct:prior.units?(cur.units-prior.units)/prior.units*100:null,
+      convDelta:cur.conv-prior.conv,
+    };
+  },[weekly,sel,period]);
+
+  const convBarData=useMemo(()=>{
+    return [...filteredTotals]
+      .sort((a,b)=>b.conv-a.conv)
+      .map(t=>({brand:t.brand,conv:t.conv||0,traffic:t.traffic||0,color:COLORS[BRANDS.indexOf(t.brand)]}));
+  },[filteredTotals]);
+
+  const trafficBarData=useMemo(()=>[...convBarData].sort((a,b)=>b.traffic-a.traffic),[convBarData]);
+
+  const insights=useMemo(()=>{
+    if(!filteredTotals.length) return null;
+    const byRev=[...filteredTotals].sort((a,b)=>b.rev-a.rev);
+    const byConv=[...filteredTotals].sort((a,b)=>b.conv-a.conv);
+    const byTraffic=[...filteredTotals].sort((a,b)=>b.traffic-a.traffic);
+    const top=byRev[0], second=byRev[1]||null, bottom=byRev[byRev.length-1];
+    const totalRevSel=filteredTotals.reduce((s,t)=>s+t.rev,0);
+    const top3=byRev.slice(0,Math.min(3,byRev.length));
+    const top3Pct=totalRevSel?top3.reduce((s,t)=>s+t.rev,0)/totalRevSel*100:0;
+    const topSharePct=totalRevSel?top.rev/totalRevSel*100:0;
+    const avgConvSel=filteredTotals.reduce((s,t)=>s+t.conv,0)/filteredTotals.length;
+    const avgTrafficSel=filteredTotals.reduce((s,t)=>s+t.traffic,0)/filteredTotals.length;
+    const convTop=byConv[0], convBottom=byConv[byConv.length-1];
+    const trafficTop=byTraffic[0];
+    const inefficient=byTraffic.filter(t=>t.traffic>=avgTrafficSel&&t.conv<avgConvSel).sort((a,b)=>b.traffic-a.traffic)[0]||null;
+    const periodLabel=period==='all'?'전체 기간(2024–2026)':`${period}년`;
+
+    const revs=filteredTotals.map(t=>t.rev), traffics=filteredTotals.map(t=>t.traffic),
+      convs=filteredTotals.map(t=>t.conv), units=filteredTotals.map(t=>t.units);
+    const n=filteredTotals.length;
+    const corrRevTraffic=pearson(revs,traffics);
+    const corrTrafficConv=pearson(traffics,convs);
+    const corrRevConv=pearson(revs,convs);
+    const corrUnitsTraffic=pearson(units,traffics);
+    const sigRevTraffic=corrSignificant(corrRevTraffic,n);
+    const sigTrafficConv=corrSignificant(corrTrafficConv,n);
+    const sigRevConv=corrSignificant(corrRevConv,n);
+    const sigUnitsTraffic=corrSignificant(corrUnitsTraffic,n);
+
+    return {periodLabel,count:filteredTotals.length,top,second,bottom,top3,top3Pct,topSharePct,
+      avgConvSel,avgTrafficSel,convTop,convBottom,trafficTop,inefficient,totalRevSel,
+      corrRevTraffic,corrTrafficConv,corrRevConv,corrUnitsTraffic,
+      sigRevTraffic,sigTrafficConv,sigRevConv,sigUnitsTraffic};
+  },[filteredTotals,period]);
+
+  if(loadError){
+    return <div style={{padding:40,color:'var(--c-red)'}}>데이터 로딩 실패: {loadError}. API 서버(uvicorn server.main:app)가 실행 중인지 확인하세요.</div>;
+  }
+  if(!weekly||!totals){
+    return <div style={{padding:40,color:'var(--c-gray-dark)'}}>데이터를 불러오는 중...</div>;
+  }
+
+  return (
+    <div>
+      <div className="header">
+        <div className="header-badge">TV</div>
+        <div>
+          <h1>US TV Market — Brand Competition Dashboard</h1>
+          <p>Amazon.com | TV Category | Weekly Data | Week 202401–202605</p>
+        </div>
+      </div>
+
+      <div className="filters">
+        <div className="filter-group">
+          <div className="filter-label">기간 선택</div>
+          <select className="filter-select" value={period} onChange={e=>setPeriod(e.target.value)}>
+            <option value="all">전체 (2024–2026)</option>
+            <option value="2024">2024년</option>
+            <option value="2025">2025년</option>
+            <option value="2026">2026년 (1~5주)</option>
+          </select>
+        </div>
+        <div className="filter-group">
+          <div className="filter-label">브랜드 선택 (클릭으로 토글)</div>
+          <div className="brand-pills">
+            <div className="select-all-pill" onClick={toggleAll}>{allSelected?'전체해제':'전체선택'}</div>
+            {BRANDS.map((b,i)=>(
+              <div key={b}
+                className={`brand-pill ${sel.has(b)?'active':''}`}
+                style={{borderColor:COLORS[i],color:COLORS[i],background:sel.has(b)?COLORS[i]+'22':'transparent'}}
+                onClick={()=>toggle(b)}
+              >{b}</div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {insights && (
+        <div className="chart-card" style={{marginBottom:16}}>
+          <div className="chart-header">
+            <div>
+              <div className="insight-summary-badge">Insight Summary</div>
+              <div className="chart-subtitle" style={{marginLeft:0,marginTop:6}}>{insights.periodLabel} · 선택 브랜드 {insights.count}개 기준 자동 생성</div>
+            </div>
+          </div>
+          <div style={{display:'flex',flexDirection:'column',gap:8}}>
+            <div className="insight-item">
+              <span className="hl">{insights.top.brand}</span>가 매출 <span className="hl">{fmtM(insights.top.rev)}</span>(점유율 <span className="hl">{fmtPct(insights.topSharePct)}</span>)로 1위이며{insights.second?<>, 2위 <span className="hl">{insights.second.brand}</span>(<span className="hl">{fmtM(insights.second.rev)}</span>)와의 격차는 <span className="hl">{fmtM(insights.top.rev-insights.second.rev)}</span></>:''}입니다.
+            </div>
+            <div className="insight-item">
+              상위 {insights.top3.length}개 브랜드({insights.top3.map(t=>t.brand).join(', ')})가 전체 매출의 <span className="hl">{fmtPct(insights.top3Pct)}</span>를 차지해, {insights.top3Pct>=70?'시장 집중도가 높은 편입니다':'비교적 고르게 분산되어 있습니다'} (선택 {insights.count}개 브랜드 총매출 <span className="hl">{fmtM(insights.totalRevSel)}</span> 기준).
+            </div>
+            <div className="insight-item">
+              매출 최저 브랜드는 <span className="hl">{insights.bottom.brand}</span>(<span className="hl">{fmtM(insights.bottom.rev)}</span>)로, 1위와의 격차는 <span className="hl">{fmtM(insights.top.rev-insights.bottom.rev)}</span>입니다.
+            </div>
+            <div className="insight-item">
+              트래픽 1위는 <span className="hl">{insights.trafficTop.brand}</span>(<span className="hl">{fmtK(insights.trafficTop.traffic)}</span>)로, {insights.trafficTop.brand===insights.top.brand?'매출 1위 브랜드와 동일하게 트래픽에서도 선두를 유지하고 있습니다':<>매출 1위(<span className="hl">{insights.top.brand}</span>)와 달라 트래픽과 매출 순위가 일치하지 않습니다</>}.
+            </div>
+            <div className="insight-item">
+              {insights.inefficient?<>
+                <span className="hl">{insights.inefficient.brand}</span>는 트래픽이 평균(<span className="hl">{fmtK(insights.avgTrafficSel)}</span>) 이상이나 전환율(<span className="hl">{fmtPct(insights.inefficient.conv)}</span>)이 선택 브랜드 평균(<span className="hl">{fmtPct(insights.avgConvSel)}</span>)보다 낮아, 트래픽 대비 구매 전환 효율 개선의 여지가 있습니다.
+              </>:<>트래픽 대비 전환 효율이 평균을 크게 벗어나는 브랜드는 없습니다 (평균 전환율 <span className="hl">{fmtPct(insights.avgConvSel)}</span> 기준).</>}
+            </div>
+            <div className="insight-item">
+              전환율 1위는 <span className="hl">{insights.convTop.brand}</span>(<span className="hl">{fmtPct(insights.convTop.conv)}</span>), 최저는 <span className="hl">{insights.convBottom.brand}</span>(<span className="hl">{fmtPct(insights.convBottom.conv)}</span>)이며, 선택 브랜드 평균은 <span className="hl">{fmtPct(insights.avgConvSel)}</span>입니다.
+            </div>
+            {insights.sigRevTraffic && (()=>{const c=corrDesc(insights.corrRevTraffic); return (
+              <div className="insight-item">
+                매출과 트래픽 간에는 <span className="hl">{c.strength} {c.dir}의 상관관계</span>(r=<span className="hl">{insights.corrRevTraffic.toFixed(2)}</span>, p&lt;0.05)가 나타나, {c.dir==='양'?'트래픽이 많은 브랜드일수록 매출도 높은 경향이 있습니다':'트래픽 규모와 매출 순위가 반대로 움직이는 경향이 있습니다'}.
+              </div>
+            );})()}
+            {insights.sigTrafficConv && (()=>{const c=corrDesc(insights.corrTrafficConv); return (
+              <div className="insight-item">
+                트래픽과 전환율 간에는 <span className="hl">{c.strength} {c.dir}의 상관관계</span>(r=<span className="hl">{insights.corrTrafficConv.toFixed(2)}</span>, p&lt;0.05)를 보여, {c.dir==='양'?'트래픽이 많을수록 전환율도 함께 높아지는 경향이 있습니다':'트래픽이 많다고 반드시 전환율이 높은 것은 아니며, 브랜드별 트래픽 대비 전환 효율 편차가 큽니다'}.
+              </div>
+            );})()}
+            {insights.sigRevConv && (()=>{const c=corrDesc(insights.corrRevConv); return (
+              <div className="insight-item">
+                매출과 전환율 간에는 <span className="hl">{c.strength} {c.dir}의 상관관계</span>(r=<span className="hl">{insights.corrRevConv.toFixed(2)}</span>, p&lt;0.05)를 보여, {c.dir==='양'?'전환율이 높은 브랜드일수록 매출도 높은 경향이 있습니다':'매출이 높다고 전환 효율까지 높은 것은 아닙니다'}.
+              </div>
+            );})()}
+            {!insights.sigRevTraffic && !insights.sigTrafficConv && !insights.sigRevConv && (
+              <div className="insight-item">
+                선택된 브랜드 조합에서는 매출·트래픽·전환율 간에 통계적으로 유의미한 상관관계(p&lt;0.05)가 발견되지 않았습니다.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className="kpi-grid">
+        <div className="kpi-card">
+          <div className="kpi-label"><span className="num-badge">1</span>총 매출 (선택 브랜드)</div>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,marginTop:2}}>
+            <div>
+              <div className="kpi-value">{fmtM(totalRev)}</div>
+              <div className="kpi-sub">{period==='all'?'전체 기간 합산 USD':`${period}년 합산 USD`}</div>
+            </div>
+            {yoy&&yoy.revPct!=null && (
+              <div style={{textAlign:'center',flexShrink:0,borderLeft:'1px solid var(--c-khaki)',padding:'0 14px'}}>
+                <div style={{fontSize:10,color:'var(--c-olive)',whiteSpace:'nowrap'}}>YoY</div>
+                <div style={{fontSize:12,fontWeight:700,whiteSpace:'nowrap',color:yoy.revPct>=0?'#1a7f37':'#c0392b'}}>{yoy.revPct>=0?'+':''}{yoy.revPct.toFixed(1)}%</div>
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="kpi-card">
+          <div className="kpi-label"><span className="num-badge">2</span>총 판매 수량</div>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,marginTop:2}}>
+            <div>
+              <div className="kpi-value">{fmtK(totalUnits)}</div>
+              <div className="kpi-sub">Units Sold</div>
+            </div>
+            {yoy&&yoy.unitsPct!=null && (
+              <div style={{textAlign:'center',flexShrink:0,borderLeft:'1px solid var(--c-khaki)',padding:'0 14px'}}>
+                <div style={{fontSize:10,color:'var(--c-olive)',whiteSpace:'nowrap'}}>YoY</div>
+                <div style={{fontSize:12,fontWeight:700,whiteSpace:'nowrap',color:yoy.unitsPct>=0?'#1a7f37':'#c0392b'}}>{yoy.unitsPct>=0?'+':''}{yoy.unitsPct.toFixed(1)}%</div>
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="kpi-card">
+          <div className="kpi-label"><span className="num-badge">3</span>매출 1위 브랜드</div>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,marginTop:2}}>
+            <div>
+              <div className="kpi-value" style={{color:topBrand?COLORS[BRANDS.indexOf(topBrand.brand)]:'var(--c-brown)'}}>{topBrand?topBrand.brand:'–'}</div>
+              <div className="kpi-sub">{topBrand?fmtM(topBrand.rev):'–'}</div>
+            </div>
+            {secondBrand && (
+              <>
+                <div style={{textAlign:'center',flexShrink:0,borderLeft:'1px solid var(--c-khaki)',borderRight:'1px solid var(--c-khaki)',padding:'0 14px'}}>
+                  <div style={{fontSize:10,color:'var(--c-olive)',whiteSpace:'nowrap'}}>격차</div>
+                  <div style={{fontSize:12,color:'var(--c-gray-dark)',fontWeight:700,whiteSpace:'nowrap'}}>+{fmtM(gapRev)}</div>
+                </div>
+                <div style={{opacity:0.6,textAlign:'left',flexShrink:0}}>
+                  <div style={{fontSize:13,fontWeight:600,color:'var(--c-brown)'}}>{secondBrand.brand}</div>
+                  <div style={{fontSize:11,color:'var(--c-gray-dark)',marginTop:1}}>{fmtM(secondBrand.rev)}</div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+        <div className="kpi-card">
+          <div className="kpi-label"><span className="num-badge">4</span>전체 기간 평균 전환율</div>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,marginTop:2}}>
+            <div>
+              <div className="kpi-value">{fmtPct(avgConv)}</div>
+              <div className="kpi-sub">선택 브랜드 평균</div>
+            </div>
+            {yoy && (
+              <div style={{textAlign:'center',flexShrink:0,borderLeft:'1px solid var(--c-khaki)',padding:'0 14px'}}>
+                <div style={{fontSize:10,color:'var(--c-olive)',whiteSpace:'nowrap'}}>YoY</div>
+                <div style={{fontSize:12,fontWeight:700,whiteSpace:'nowrap',color:yoy.convDelta>=0?'#1a7f37':'#c0392b'}}>{yoy.convDelta>=0?'+':''}{yoy.convDelta.toFixed(1)}%p</div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="charts-grid-2">
+        <div className="chart-card">
+          <div className="chart-header">
+            <div>
+              <div className="chart-title"><span className="num-badge">5</span>시장 점유율</div>
+              <div className="chart-subtitle">선택 브랜드 내 비중</div>
+            </div>
+            <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:6,flex:1,marginLeft:20}}>
+              {pieData.length>0 && (
+                <div className="chart-header-insight" style={{width:'100%'}}>
+                  <span className="hl">{pieData[0].name}</span>이 <span className="hl">{fmtPct(pieData[0].pct)}</span>로 가장 큰 비중을 차지하며, 상위 3개 브랜드가 전체의 <span className="hl">{fmtPct(pieData.slice(0,3).reduce((s,d)=>s+d.pct,0))}</span>를 차지합니다.
+                </div>
+              )}
+              <div className="toggle-group">
+                <button className={`toggle-btn ${metric==='rev'?'active':''}`} onClick={()=>setMetric('rev')}>매출</button>
+                <button className={`toggle-btn ${metric==='units'?'active':''}`} onClick={()=>setMetric('units')}>수량</button>
+              </div>
+            </div>
+          </div>
+          <ResponsiveContainer width="100%" height={280}>
+            <PieChart>
+              <Pie data={pieData} cx="50%" cy="50%" innerRadius={65} outerRadius={110}
+                dataKey="value" nameKey="name" paddingAngle={2} labelLine={false}
+                label={(props)=>{
+                  const {cx,cy,midAngle,outerRadius,index,value}=props;
+                  if(index!==0 && index!==pieData.length-1) return null;
+                  const RADIAN=Math.PI/180;
+                  const radius=outerRadius+18;
+                  const x=cx+radius*Math.cos(-midAngle*RADIAN);
+                  const y=cy+radius*Math.sin(-midAngle*RADIAN);
+                  return <text x={x} y={y} fill="var(--c-brown)" fontSize={11} fontWeight={700} textAnchor={x>cx?'start':'end'} dominantBaseline="central">{metric==='rev'?fmtM(value):fmtK(value)}</text>;
+                }}>
+                {pieData.map((d,i)=><Cell key={d.name} fill={d.fill}/>)}
+              </Pie>
+              <Tooltip content={<CustomPieTooltip/>}/>
+              <Legend iconType="circle" iconSize={9} formatter={(v)=><span style={{fontSize:12,color:'#47422E'}}>{v}</span>}/>
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div className="chart-card">
+          <div className="chart-header">
+            <div>
+              <div className="chart-title"><span className="num-badge">6</span>브랜드별 {metric==='rev'?'매출':'판매수량'} 비교</div>
+              <div className="chart-subtitle">내림차순 정렬</div>
+            </div>
+            {barData.length>0 && (
+              <div className="chart-header-insight" style={{flex:1,marginLeft:20}}>
+                <span className="hl">{barData[0].brand}</span>이 <span className="hl">{metric==='rev'?fmtM(barData[0].value):fmtK(barData[0].value)}</span>로 1위, <span className="hl">{barData[barData.length-1].brand}</span>이 <span className="hl">{metric==='rev'?fmtM(barData[barData.length-1].value):fmtK(barData[barData.length-1].value)}</span>로 최하위를 기록해 브랜드 간 격차가 뚜렷합니다.
+              </div>
+            )}
+          </div>
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={barData} layout="vertical" margin={{left:10,right:60,top:0,bottom:0}}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#EAEAEA" horizontal={false}/>
+              <XAxis type="number" tickFormatter={v=>metric==='rev'?fmtM(v):fmtK(v)} tick={{fill:'#6E6E6E',fontSize:11}} axisLine={false} tickLine={false}/>
+              <YAxis type="category" dataKey="brand" width={70} tick={{fill:'#47422E',fontSize:12}} axisLine={false} tickLine={false}/>
+              <Tooltip formatter={(v)=>metric==='rev'?['$'+v.toLocaleString(),'Revenue']:[ v.toLocaleString(),'Units']} contentStyle={{background:'#fff',border:'1px solid #EAEAEA',borderRadius:8,fontSize:12,boxShadow:'0 4px 12px rgba(71,66,46,.14)'}}/>
+              <Bar dataKey="value" radius={[0,4,4,0]}>
+                {barData.map((d,i)=><Cell key={d.brand} fill={d.color}/>)}
+                <LabelList dataKey="value" content={extremeBarLabel(barData, metric==='rev'?fmtM:fmtK)}/>
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+          <BarLegend data={barData}/>
+        </div>
+      </div>
+
+      <div className="charts-grid-1">
+        <div className="chart-card">
+          <div className="chart-header">
+            <div>
+              <div className="chart-title"><span className="num-badge">7</span>주차별 {metric==='rev'?'매출':'판매수량'} 트렌드</div>
+              <div className="chart-subtitle">월별 집계 · 선택 브랜드 비교</div>
+            </div>
+            {trendPeak && (
+              <div className="chart-header-insight" style={{flex:1,marginLeft:20}}>
+                선택 브랜드 합산 {metric==='rev'?'매출':'판매량'}은 <span className="hl">{trendPeak.label}</span> 주간에 <span className="hl">{metric==='rev'?fmtM(trendPeak.sum):fmtK(trendPeak.sum)}</span>로 최고치를 기록했으며, 기간 내내 뚜렷한 등락을 보입니다.
+              </div>
+            )}
+          </div>
+          <ResponsiveContainer width="100%" height={280}>
+            <LineChart data={trendData} margin={{left:10,right:20,top:4,bottom:4}}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#EAEAEA"/>
+              <XAxis dataKey="label" tick={{fill:'#6E6E6E',fontSize:11}} axisLine={false} tickLine={false} interval="preserveStartEnd"/>
+              <YAxis tickFormatter={v=>metric==='rev'?fmtM(v):fmtK(v)} tick={{fill:'#6E6E6E',fontSize:11}} axisLine={false} tickLine={false}/>
+              <Tooltip content={<CustomTooltip metric={metric}/>}/>
+              <Legend iconType="circle" iconSize={8} formatter={v=><span style={{fontSize:12,color:'#47422E'}}>{v}</span>}/>
+              {[...sel].map(b=>(
+                <Line key={b} type="monotone"
+                  dataKey={metric==='rev'?b:b+'_u'}
+                  name={b} stroke={COLORS[BRANDS.indexOf(b)]}
+                  strokeDasharray={DASHES[BRANDS.indexOf(b)]}
+                  dot={false} strokeWidth={1.8} connectNulls/>
+              ))}
+              {trendGlobalMax && (
+                <ReferenceDot x={trendGlobalMax.label} y={trendGlobalMax.value} r={4}
+                  fill={COLORS[BRANDS.indexOf(trendGlobalMax.brand)]} stroke="#fff" strokeWidth={2}
+                  label={{value:(metric==='rev'?fmtM(trendGlobalMax.value):fmtK(trendGlobalMax.value)),position:'top',fontSize:11,fontWeight:700,fill:'var(--c-brown)'}}
+                  ifOverflow="extendDomain"/>
+              )}
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      <div className="charts-grid-2">
+        <div className="chart-card">
+          <div className="chart-header">
+            <div>
+              <div className="chart-title"><span className="num-badge">8</span>브랜드별 전환율 (Conversion Rate)</div>
+              <div className="chart-subtitle">{period==='all'?'전체 기간':`${period}년`} 평균 · 높을수록 구매 효율 우수</div>
+            </div>
+            {convBarData.length>0 && (
+              <div className="chart-header-insight" style={{flex:1,marginLeft:20}}>
+                전환율은 <span className="hl">{convBarData[0].brand}</span>이 <span className="hl">{fmtPct(convBarData[0].conv)}</span>로 가장 높고 <span className="hl">{convBarData[convBarData.length-1].brand}</span>이 <span className="hl">{fmtPct(convBarData[convBarData.length-1].conv)}</span>로 가장 낮아, 브랜드별 구매 전환 효율 차이가 큽니다.
+              </div>
+            )}
+          </div>
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={convBarData} layout="vertical" margin={{left:10,right:50,top:0,bottom:0}}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#EAEAEA" horizontal={false}/>
+              <XAxis type="number" tickFormatter={v=>v+'%'} tick={{fill:'#6E6E6E',fontSize:11}} axisLine={false} tickLine={false}/>
+              <YAxis type="category" dataKey="brand" width={70} tick={{fill:'#47422E',fontSize:12}} axisLine={false} tickLine={false}/>
+              <Tooltip formatter={v=>[v.toFixed(2)+'%','Conversion Rate']} contentStyle={{background:'#fff',border:'1px solid #EAEAEA',borderRadius:8,fontSize:12,boxShadow:'0 4px 12px rgba(71,66,46,.14)'}}/>
+              <Bar dataKey="conv" radius={[0,4,4,0]}>
+                {convBarData.map((d,i)=><Cell key={d.brand} fill={d.color}/>)}
+                <LabelList dataKey="conv" content={extremeBarLabel(convBarData, fmtPct)}/>
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+          <BarLegend data={convBarData}/>
+        </div>
+
+        <div className="chart-card">
+          <div className="chart-header">
+            <div>
+              <div className="chart-title"><span className="num-badge">9</span>브랜드별 Total Traffic</div>
+              <div className="chart-subtitle">{period==='all'?'전체 기간':`${period}년`} 합산 · 브랜드 노출 규모</div>
+            </div>
+            {trafficBarData.length>0 && (
+              <div className="chart-header-insight" style={{flex:1,marginLeft:20}}>
+                트래픽은 <span className="hl">{trafficBarData[0].brand}</span>이 <span className="hl">{fmtK(trafficBarData[0].traffic)}</span>로 가장 많고 <span className="hl">{trafficBarData[trafficBarData.length-1].brand}</span>이 <span className="hl">{fmtK(trafficBarData[trafficBarData.length-1].traffic)}</span>로 가장 적어, 브랜드 노출 규모 차이가 뚜렷합니다.
+              </div>
+            )}
+          </div>
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={trafficBarData} layout="vertical" margin={{left:10,right:60,top:0,bottom:0}}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#EAEAEA" horizontal={false}/>
+              <XAxis type="number" tickFormatter={v=>fmtK(v)} tick={{fill:'#6E6E6E',fontSize:11}} axisLine={false} tickLine={false}/>
+              <YAxis type="category" dataKey="brand" width={70} tick={{fill:'#47422E',fontSize:12}} axisLine={false} tickLine={false}/>
+              <Tooltip formatter={v=>[v.toLocaleString(),'Total Traffic']} contentStyle={{background:'#fff',border:'1px solid #EAEAEA',borderRadius:8,fontSize:12,boxShadow:'0 4px 12px rgba(71,66,46,.14)'}}/>
+              <Bar dataKey="traffic" radius={[0,4,4,0]}>
+                {trafficBarData.map((d,i)=><Cell key={d.brand} fill={d.color}/>)}
+                <LabelList dataKey="traffic" content={extremeBarLabel(trafficBarData, fmtK)}/>
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+          <BarLegend data={trafficBarData}/>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<Dashboard/>);
+</script>
+</body>
+</html>
