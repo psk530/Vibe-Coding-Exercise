@@ -191,7 +191,7 @@ function weekToLabel(w){
 function buildTrendData(weekly, selectedBrands, period){
   const map={};
   for(const row of weekly){
-    const {week:wk,brand:b,rev,units,traffic}=row;
+    const {week:wk,brand:b,rev,units,traffic,organic}=row;
     const yr=Math.floor(wk/100);
     if(period!=='all' && yr!==parseInt(period)) continue;
     if(!selectedBrands.includes(b)) continue;
@@ -200,6 +200,7 @@ function buildTrendData(weekly, selectedBrands, period){
     map[key][b]=(map[key][b]||0)+rev;
     map[key][b+'_u']=(map[key][b+'_u']||0)+units;
     map[key][b+'_t']=(map[key][b+'_t']||0)+(traffic||0);
+    map[key][b+'_o']=(map[key][b+'_o']||0)+(organic||0);
   }
   return Object.values(map).sort((a,b)=>a._wk-b._wk);
 }
@@ -463,6 +464,7 @@ function Dashboard(){
   const [osShare,setOsShare]=useState(null);
   const [topModels,setTopModels]=useState(null);
   const [modelSort,setModelSort]=useState('units_sold');
+  const [trafficMetric,setTrafficMetric]=useState('total');
   const draggingRef=useRef(false);
 
   useEffect(()=>{
@@ -579,29 +581,31 @@ function Dashboard(){
     return best;
   },[trendData,sel,metric]);
 
+  const trafficSuffix=trafficMetric==='total'?'_t':'_o';
+
   const trafficTrendPeak=useMemo(()=>{
     if(!trendData.length) return null;
     let best=null;
     for(const row of trendData){
       let sum=0;
-      for(const b of sel){ sum+=row[b+'_t']||0; }
+      for(const b of sel){ sum+=row[b+trafficSuffix]||0; }
       if(!best||sum>best.sum) best={label:row.label,sum};
     }
     return best;
-  },[trendData,sel]);
+  },[trendData,sel,trafficSuffix]);
 
   const trafficTrendGlobalMax=useMemo(()=>{
     if(!trendData.length) return null;
     let best=null;
     for(const row of trendData){
       for(const b of sel){
-        const v=row[b+'_t'];
+        const v=row[b+trafficSuffix];
         if(v==null) continue;
         if(!best||v>best.value) best={label:row.label,value:v,brand:b};
       }
     }
     return best;
-  },[trendData,sel]);
+  },[trendData,sel,trafficSuffix]);
 
   const rankedByRev=useMemo(()=>[...filteredTotals].sort((a,b)=>b.rev-a.rev),[filteredTotals]);
   const topBrand=rankedByRev[0]||null;
@@ -765,6 +769,11 @@ function Dashboard(){
             <div className="insight-item">
               전환율 1위는 <span className="hl">{insights.convTop.brand}</span>(<span className="hl">{fmtPct(insights.convTop.conv)}</span>), 최저는 <span className="hl">{insights.convBottom.brand}</span>(<span className="hl">{fmtPct(insights.convBottom.conv)}</span>)이며, 선택 브랜드 평균은 <span className="hl">{fmtPct(insights.avgConvSel)}</span>입니다.
             </div>
+            {osPieData.length>0 && (
+              <div className="insight-item">
+                OS 플랫폼별로는 <span className="hl">{osPieData[0].name}</span>가 판매량 기준 <span className="hl">{fmtPct(osPieData[0].pct)}</span>로 가장 큰 비중을 차지해, TV 운영체제 생태계가 특정 플랫폼에 집중되어 있습니다.
+              </div>
+            )}
             {insights.sigRevTraffic && (()=>{const c=corrDesc(insights.corrRevTraffic); return (
               <div className="insight-item">
                 매출과 트래픽 간에는 <span className="hl">{c.strength} {c.dir}의 상관관계</span>(상관계수 <span className="hl">{insights.corrRevTraffic.toFixed(2)}</span>, p&lt;0.05)가 나타나, {c.dir==='양'?'트래픽이 많은 브랜드일수록 매출도 높은 경향이 있습니다':'트래픽 규모와 매출 순위가 반대로 움직이는 경향이 있습니다'}.
@@ -971,11 +980,17 @@ function Dashboard(){
               <div className="chart-title"><span className="num-badge">8</span>주차별 트래픽 트렌드</div>
               <div className="chart-subtitle">월별 집계 · 선택 브랜드 비교</div>
             </div>
-            {trafficTrendPeak && (
-              <div className="chart-header-insight" style={{flex:1,marginLeft:20}}>
-                선택 브랜드 합산 트래픽은 <span className="hl">{trafficTrendPeak.label}</span> 주간에 <span className="hl">{fmtK(trafficTrendPeak.sum)}</span>로 최고치를 기록했으며, 기간 내내 뚜렷한 등락을 보입니다.
+            <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:6,flex:1,marginLeft:20}}>
+              {trafficTrendPeak && (
+                <div className="chart-header-insight" style={{width:'100%'}}>
+                  선택 브랜드 합산 {trafficMetric==='total'?'Total':'Organic'} 트래픽은 <span className="hl">{trafficTrendPeak.label}</span> 주간에 <span className="hl">{fmtK(trafficTrendPeak.sum)}</span>로 최고치를 기록했으며, 기간 내내 뚜렷한 등락을 보입니다.
+                </div>
+              )}
+              <div className="toggle-group">
+                <button className={`toggle-btn ${trafficMetric==='total'?'active':''}`} onClick={()=>setTrafficMetric('total')}>Total</button>
+                <button className={`toggle-btn ${trafficMetric==='organic'?'active':''}`} onClick={()=>setTrafficMetric('organic')}>Organic</button>
               </div>
-            )}
+            </div>
           </div>
           <ResponsiveContainer width="100%" height={280}>
             <LineChart data={trendData} margin={{left:10,right:20,top:4,bottom:4}}>
@@ -986,7 +1001,7 @@ function Dashboard(){
               <Legend iconType="circle" iconSize={8} formatter={v=><span style={{fontSize:12,color:'#47422E'}}>{v}</span>}/>
               {[...sel].map(b=>(
                 <Line key={b} type="monotone"
-                  dataKey={b+'_t'}
+                  dataKey={b+trafficSuffix}
                   name={b} stroke={COLORS[BRANDS.indexOf(b)]}
                   strokeDasharray={DASHES[BRANDS.indexOf(b)]}
                   dot={false} strokeWidth={1.8} connectNulls/>
@@ -1058,20 +1073,22 @@ function Dashboard(){
         </div>
       </div>
 
-      <div className="charts-grid-1">
+      <div className="charts-grid-2">
         <div className="chart-card">
-          <div className="chart-header">
-            <div>
-              <div className="chart-title"><span className="num-badge">11</span>브랜드별 Total Traffic 대비 전환율 분석</div>
-              <div className="chart-subtitle">{period==='all'?'전체 기간':`${period}년`} 기준 · X축 트래픽, Y축 전환율</div>
+          <div className="chart-header" style={{flexDirection:'column',alignItems:'stretch'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+              <div>
+                <div className="chart-title"><span className="num-badge">11</span>브랜드별 Total Traffic 대비 전환율 분석</div>
+                <div className="chart-subtitle">{period==='all'?'전체 기간':`${period}년`} 기준 · X축 트래픽, Y축 전환율</div>
+              </div>
+              {insights && <CorrBadge r={insights.corrTrafficConv}/>}
             </div>
             {insights && (
-              <div className="chart-header-insight" style={{flex:1,marginLeft:20}}>
+              <div className="chart-header-insight" style={{marginTop:8}}>
                 {insights.sigTrafficConv?(()=>{const c=corrDesc(insights.corrTrafficConv); return <>트래픽과 전환율 간에는 <span className="hl">{c.strength} {c.dir}의 상관관계</span>(상관계수 <span className="hl">{insights.corrTrafficConv.toFixed(2)}</span>)가 있어, {c.dir==='양'?'트래픽이 많을수록 전환율도 높아지는 경향이 있습니다':'트래픽이 많다고 전환율이 높은 것은 아닙니다'}.</>;})():<>트래픽과 전환율 간에 뚜렷한 상관관계는 보이지 않아, 브랜드별 효율 편차가 큽니다.</>}
                 {insights.inefficient && <> 특히 <span className="hl">{insights.inefficient.brand}</span>는 트래픽 대비 전환 효율 개선의 여지가 있습니다.</>}
               </div>
             )}
-            {insights && <CorrBadge r={insights.corrTrafficConv}/>}
           </div>
           <ResponsiveContainer width="100%" height={320}>
             <ScatterChart margin={{left:20,right:30,top:20,bottom:20}}>
@@ -1089,21 +1106,21 @@ function Dashboard(){
           </ResponsiveContainer>
           <BarLegend data={convBarData}/>
         </div>
-      </div>
 
-      <div className="charts-grid-1">
         <div className="chart-card">
-          <div className="chart-header">
-            <div>
-              <div className="chart-title"><span className="num-badge">12</span>브랜드별 매출 대비 전환율 분석</div>
-              <div className="chart-subtitle">{period==='all'?'전체 기간':`${period}년`} 기준 · X축 매출, Y축 전환율</div>
+          <div className="chart-header" style={{flexDirection:'column',alignItems:'stretch'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+              <div>
+                <div className="chart-title"><span className="num-badge">12</span>브랜드별 매출 대비 전환율 분석</div>
+                <div className="chart-subtitle">{period==='all'?'전체 기간':`${period}년`} 기준 · X축 매출, Y축 전환율</div>
+              </div>
+              {insights && <CorrBadge r={insights.corrRevConv}/>}
             </div>
             {insights && (
-              <div className="chart-header-insight" style={{flex:1,marginLeft:20}}>
+              <div className="chart-header-insight" style={{marginTop:8}}>
                 {insights.sigRevConv?(()=>{const c=corrDesc(insights.corrRevConv); return <>매출과 전환율 간에는 <span className="hl">{c.strength} {c.dir}의 상관관계</span>(상관계수 <span className="hl">{insights.corrRevConv.toFixed(2)}</span>)가 있어, {c.dir==='양'?'매출이 높은 브랜드일수록 전환율도 높은 경향이 있습니다':'매출이 높다고 전환 효율까지 높은 것은 아닙니다'}.</>;})():<>매출과 전환율 간에 뚜렷한 상관관계는 보이지 않아, 매출 규모만으로는 전환 효율을 설명하기 어렵습니다.</>}
               </div>
             )}
-            {insights && <CorrBadge r={insights.corrRevConv}/>}
           </div>
           <ResponsiveContainer width="100%" height={320}>
             <ScatterChart margin={{left:20,right:30,top:20,bottom:20}}>
@@ -1123,19 +1140,21 @@ function Dashboard(){
         </div>
       </div>
 
-      <div className="charts-grid-1">
+      <div className="charts-grid-2">
         <div className="chart-card">
-          <div className="chart-header">
-            <div>
-              <div className="chart-title"><span className="num-badge">13</span>브랜드별 Total Traffic 대비 매출 분석</div>
-              <div className="chart-subtitle">{period==='all'?'전체 기간':`${period}년`} 기준 · X축 트래픽, Y축 매출</div>
+          <div className="chart-header" style={{flexDirection:'column',alignItems:'stretch'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+              <div>
+                <div className="chart-title"><span className="num-badge">13</span>브랜드별 Total Traffic 대비 매출 분석</div>
+                <div className="chart-subtitle">{period==='all'?'전체 기간':`${period}년`} 기준 · X축 트래픽, Y축 매출</div>
+              </div>
+              {insights && <CorrBadge r={insights.corrRevTraffic}/>}
             </div>
             {insights && (
-              <div className="chart-header-insight" style={{flex:1,marginLeft:20}}>
+              <div className="chart-header-insight" style={{marginTop:8}}>
                 {insights.sigRevTraffic?(()=>{const c=corrDesc(insights.corrRevTraffic); return <>트래픽과 매출 간에는 <span className="hl">{c.strength} {c.dir}의 상관관계</span>(상관계수 <span className="hl">{insights.corrRevTraffic.toFixed(2)}</span>, p&lt;0.05)가 있어, {c.dir==='양'?'트래픽이 많은 브랜드일수록 매출도 높은 경향이 있습니다':'트래픽 규모와 매출이 반대로 움직이는 경향이 있습니다'}.</>;})():<>트래픽과 매출 간에 뚜렷한 상관관계는 보이지 않습니다.</>}
               </div>
             )}
-            {insights && <CorrBadge r={insights.corrRevTraffic}/>}
           </div>
           <ResponsiveContainer width="100%" height={320}>
             <ScatterChart margin={{left:20,right:30,top:20,bottom:20}}>
@@ -1153,17 +1172,15 @@ function Dashboard(){
           </ResponsiveContainer>
           <BarLegend data={trafficRevData}/>
         </div>
-      </div>
 
-      <div className="charts-grid-1">
         <div className="chart-card">
-          <div className="chart-header">
+          <div className="chart-header" style={{flexDirection:'column',alignItems:'stretch'}}>
             <div>
               <div className="chart-title"><span className="num-badge">14</span>OS별 점유율</div>
               <div className="chart-subtitle">{period==='all'?'전체 기간':`${period}년`} 기준 · 10개 브랜드 판매량(Units Sold) 기준</div>
             </div>
             {osPieData.length>0 && (
-              <div className="chart-header-insight" style={{flex:1,marginLeft:20}}>
+              <div className="chart-header-insight" style={{marginTop:8}}>
                 <span className="hl">{osPieData[0].name}</span>이 <span className="hl">{fmtPct(osPieData[0].pct)}</span>로 가장 큰 비중을 차지하며, 상위 3개 OS가 전체의 <span className="hl">{fmtPct(osPieData.slice(0,3).reduce((s,d)=>s+d.pct,0))}</span>를 차지합니다.
               </div>
             )}

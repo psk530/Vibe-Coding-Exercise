@@ -31,6 +31,7 @@ SCHEMA = """
     rev     INTEGER NOT NULL,
     units   INTEGER NOT NULL,
     traffic INTEGER NOT NULL,
+    organic INTEGER NOT NULL,
     PRIMARY KEY (week_id, brand)
 """
 
@@ -83,18 +84,20 @@ def load_weekly_sales(df: pd.DataFrame, conn: sqlite3.Connection):
             units=("Units Sold", "sum"),
             rev=("Retail Sales (USD)", "sum"),
             traffic=("Total Traffic", "sum"),
+            organic=("Organic Traffic", "sum"),
         )
         .reset_index()
     )
     agg["rev"] = agg["rev"].round().astype(int)
     agg["units"] = agg["units"].astype(int)
     agg["traffic"] = agg["traffic"].astype(int)
+    agg["organic"] = agg["organic"].astype(int)
 
     conn.execute("DROP TABLE IF EXISTS weekly_sales_new")
     conn.execute(f"CREATE TABLE weekly_sales_new ({SCHEMA})")
     conn.executemany(
-        "INSERT INTO weekly_sales_new (week_id, brand, rev, units, traffic) VALUES (?,?,?,?,?)",
-        agg[["Week ID", "brand_norm", "rev", "units", "traffic"]].itertuples(index=False, name=None),
+        "INSERT INTO weekly_sales_new (week_id, brand, rev, units, traffic, organic) VALUES (?,?,?,?,?,?)",
+        agg[["Week ID", "brand_norm", "rev", "units", "traffic", "organic"]].itertuples(index=False, name=None),
     )
     conn.execute("CREATE INDEX idx_weekly_sales_new_week ON weekly_sales_new(week_id)")
     conn.execute("CREATE INDEX idx_weekly_sales_new_brand ON weekly_sales_new(brand)")

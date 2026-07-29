@@ -183,7 +183,7 @@ def get_conn():
 def weekly():
     conn = get_conn()
     rows = conn.execute(
-        "SELECT week_id AS week, brand, rev, units, traffic FROM weekly_sales ORDER BY week_id, brand"
+        "SELECT week_id AS week, brand, rev, units, traffic, organic FROM weekly_sales ORDER BY week_id, brand"
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
