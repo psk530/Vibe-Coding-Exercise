@@ -197,7 +197,8 @@ def totals():
         SELECT brand,
                SUM(rev) AS rev,
                SUM(units) AS units,
-               SUM(traffic) AS traffic
+               SUM(traffic) AS traffic,
+               SUM(organic) AS organic
         FROM weekly_sales
         GROUP BY brand
         """
@@ -211,6 +212,7 @@ def totals():
             "rev": r["rev"],
             "units": r["units"],
             "traffic": r["traffic"],
+            "organic": r["organic"],
             "conv": round(conv, 2),
         })
     return result
