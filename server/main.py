@@ -134,12 +134,15 @@ def chat(req: ChatRequest):
             input=input_messages,
             tools=[{"type": "web_search_preview"}],
         )
-    except Exception:
-        resp = openai_client.responses.create(
-            model=CHAT_MODEL,
-            instructions=system,
-            input=input_messages,
-        )
+    except Exception as e1:
+        try:
+            resp = openai_client.responses.create(
+                model=CHAT_MODEL,
+                instructions=system,
+                input=input_messages,
+            )
+        except Exception as e2:
+            raise HTTPException(500, f"tools_call_error={e1!r}; no_tools_call_error={e2!r}")
 
     return {"reply": resp.output_text or "답변을 생성하지 못했습니다."}
 
