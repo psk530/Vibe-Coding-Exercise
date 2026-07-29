@@ -191,7 +191,7 @@ function CustomPieTooltip({active,payload}){
   );
 }
 
-function CustomScatterTooltip({active,payload}){
+function CustomScatterTooltip({active,payload,xKey,xLabel,xFmt}){
   if(!active||!payload||!payload.length) return null;
   const d=payload[0].payload;
   return(
@@ -201,7 +201,7 @@ function CustomScatterTooltip({active,payload}){
         <span className="ctt-name">{d.brand}</span>
       </div>
       <div style={{marginTop:4,display:'flex',justifyContent:'space-between',gap:12}}>
-        <span className="ctt-name">Traffic</span><span className="ctt-val">{fmtK(d.traffic)}</span>
+        <span className="ctt-name">{xLabel}</span><span className="ctt-val">{xFmt(d[xKey])}</span>
       </div>
       <div style={{display:'flex',justifyContent:'space-between',gap:12}}>
         <span className="ctt-name">Conversion</span><span className="ctt-val">{fmtPct(d.conv)}</span>
@@ -362,6 +362,11 @@ function Dashboard(){
   },[filteredTotals]);
 
   const trafficBarData=useMemo(()=>[...convBarData].sort((a,b)=>b.traffic-a.traffic),[convBarData]);
+
+  const revConvData=useMemo(()=>{
+    return [...filteredTotals].sort((a,b)=>b.rev-a.rev)
+      .map(t=>({brand:t.brand,rev:t.rev,conv:t.conv||0,color:COLORS[BRANDS.indexOf(t.brand)]}));
+  },[filteredTotals]);
 
   const insights=useMemo(()=>{
     if(!filteredTotals.length) return null;
@@ -783,7 +788,7 @@ function Dashboard(){
                 label={{value:'Total Traffic',position:'insideBottom',offset:-8,fontSize:11,fill:'#6E6E6E'}}/>
               <YAxis type="number" dataKey="conv" name="Conversion Rate" tickFormatter={v=>v+'%'} tick={{fill:'#6E6E6E',fontSize:11}} axisLine={false} tickLine={false}
                 label={{value:'Conversion Rate',angle:-90,position:'insideLeft',fontSize:11,fill:'#6E6E6E'}}/>
-              <Tooltip content={<CustomScatterTooltip/>} cursor={{strokeDasharray:'3 3'}}/>
+              <Tooltip content={<CustomScatterTooltip xKey="traffic" xLabel="Traffic" xFmt={fmtK}/>} cursor={{strokeDasharray:'3 3'}}/>
               <Scatter data={convBarData}>
                 {convBarData.map(d=><Cell key={d.brand} fill={d.color}/>)}
                 <LabelList dataKey="brand" position="top" style={{fontSize:11,fontWeight:600,fill:'var(--c-brown)'}}/>
@@ -791,6 +796,37 @@ function Dashboard(){
             </ScatterChart>
           </ResponsiveContainer>
           <BarLegend data={convBarData}/>
+        </div>
+      </div>
+
+      <div className="charts-grid-1">
+        <div className="chart-card">
+          <div className="chart-header">
+            <div>
+              <div className="chart-title"><span className="num-badge">12</span>브랜드별 매출 대비 전환율 분석</div>
+              <div className="chart-subtitle">{period==='all'?'전체 기간':`${period}년`} 기준 · X축 매출, Y축 전환율</div>
+            </div>
+            {insights && (
+              <div className="chart-header-insight" style={{flex:1,marginLeft:20}}>
+                {insights.sigRevConv?(()=>{const c=corrDesc(insights.corrRevConv); return <>매출과 전환율 간에는 <span className="hl">{c.strength} {c.dir}의 상관관계</span>(r=<span className="hl">{insights.corrRevConv.toFixed(2)}</span>)가 있어, {c.dir==='양'?'매출이 높은 브랜드일수록 전환율도 높은 경향이 있습니다':'매출이 높다고 전환 효율까지 높은 것은 아닙니다'}.</>;})():<>매출과 전환율 간에 뚜렷한 상관관계는 보이지 않아, 매출 규모만으로는 전환 효율을 설명하기 어렵습니다.</>}
+              </div>
+            )}
+          </div>
+          <ResponsiveContainer width="100%" height={320}>
+            <ScatterChart margin={{left:20,right:30,top:20,bottom:20}}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#EAEAEA"/>
+              <XAxis type="number" dataKey="rev" name="Revenue" tickFormatter={fmtM} tick={{fill:'#6E6E6E',fontSize:11}} axisLine={false} tickLine={false}
+                label={{value:'Revenue',position:'insideBottom',offset:-8,fontSize:11,fill:'#6E6E6E'}}/>
+              <YAxis type="number" dataKey="conv" name="Conversion Rate" tickFormatter={v=>v+'%'} tick={{fill:'#6E6E6E',fontSize:11}} axisLine={false} tickLine={false}
+                label={{value:'Conversion Rate',angle:-90,position:'insideLeft',fontSize:11,fill:'#6E6E6E'}}/>
+              <Tooltip content={<CustomScatterTooltip xKey="rev" xLabel="Revenue" xFmt={fmtM}/>} cursor={{strokeDasharray:'3 3'}}/>
+              <Scatter data={revConvData}>
+                {revConvData.map(d=><Cell key={d.brand} fill={d.color}/>)}
+                <LabelList dataKey="brand" position="top" style={{fontSize:11,fontWeight:600,fill:'var(--c-brown)'}}/>
+              </Scatter>
+            </ScatterChart>
+          </ResponsiveContainer>
+          <BarLegend data={revConvData}/>
         </div>
       </div>
     </div>
