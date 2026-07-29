@@ -238,15 +238,21 @@ function CorrBadge({r}){
   );
 }
 
+const CHAT_STAGES=['질문을 분석하고 있어요...','대시보드 데이터를 조회하고 있어요...','관련 정보를 검색하고 있어요...','답변을 정리하고 있어요...'];
+
 function ChatPanel(){
   const [messages,setMessages]=useState([]);
   const [input,setInput]=useState('');
   const [sending,setSending]=useState(false);
+  const [stageIdx,setStageIdx]=useState(0);
   const bottomRef=useRef(null);
+  const stageTimerRef=useRef(null);
 
   useEffect(()=>{
     bottomRef.current?.scrollIntoView({behavior:'smooth'});
-  },[messages,sending]);
+  },[messages,sending,stageIdx]);
+
+  useEffect(()=>()=>clearInterval(stageTimerRef.current),[]);
 
   const send=()=>{
     const text=input.trim();
@@ -255,6 +261,10 @@ function ChatPanel(){
     setMessages(prev=>[...prev,{role:'user',content:text}]);
     setInput('');
     setSending(true);
+    setStageIdx(0);
+    stageTimerRef.current=setInterval(()=>{
+      setStageIdx(i=>Math.min(i+1,CHAT_STAGES.length-1));
+    },1600);
     fetch('/api/chat',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
@@ -266,7 +276,10 @@ function ChatPanel(){
       setMessages(prev=>[...prev,{role:'assistant',content:data.reply}]);
     }).catch(e=>{
       setMessages(prev=>[...prev,{role:'assistant',content:'답변을 가져오지 못했습니다: '+e.message,error:true}]);
-    }).finally(()=>setSending(false));
+    }).finally(()=>{
+      clearInterval(stageTimerRef.current);
+      setSending(false);
+    });
   };
 
   const onKeyDown=e=>{
@@ -278,7 +291,7 @@ function ChatPanel(){
 
   return (
     <>
-      <div className="chat-header">대시보드 Q&amp;A</div>
+      <div className="chat-header">Insight Finder</div>
       {messages.length===0 && (
         <div className="chat-empty-hint">
           왼쪽 대시보드 데이터에 대해 질문해 보세요.<br/>
@@ -291,7 +304,7 @@ function ChatPanel(){
         {messages.map((m,i)=>(
           <div key={i} className={"chat-msg "+(m.role==='user'?'user':m.error?'error':'bot')}>{m.content}</div>
         ))}
-        {sending && <div className="chat-msg pending">답변 생성 중...</div>}
+        {sending && <div className="chat-msg pending">{CHAT_STAGES[stageIdx]}</div>}
         <div ref={bottomRef}/>
       </div>
       <div className="chat-input-row">
