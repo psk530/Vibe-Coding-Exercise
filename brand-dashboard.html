@@ -191,9 +191,10 @@ function CustomPieTooltip({active,payload}){
   );
 }
 
-function CustomScatterTooltip({active,payload,xKey,xLabel,xFmt}){
+function CustomScatterTooltip({active,payload,xKey,xLabel,xFmt,yKey,yLabel,yFmt}){
   if(!active||!payload||!payload.length) return null;
   const d=payload[0].payload;
+  const yK=yKey||'conv', yL=yLabel||'Conversion', yF=yFmt||fmtPct;
   return(
     <div className="ctt">
       <div className="ctt-item">
@@ -204,7 +205,7 @@ function CustomScatterTooltip({active,payload,xKey,xLabel,xFmt}){
         <span className="ctt-name">{xLabel}</span><span className="ctt-val">{xFmt(d[xKey])}</span>
       </div>
       <div style={{display:'flex',justifyContent:'space-between',gap:12}}>
-        <span className="ctt-name">Conversion</span><span className="ctt-val">{fmtPct(d.conv)}</span>
+        <span className="ctt-name">{yL}</span><span className="ctt-val">{yF(d[yK])}</span>
       </div>
     </div>
   );
@@ -366,6 +367,11 @@ function Dashboard(){
   const revConvData=useMemo(()=>{
     return [...filteredTotals].sort((a,b)=>b.rev-a.rev)
       .map(t=>({brand:t.brand,rev:t.rev,conv:t.conv||0,color:COLORS[BRANDS.indexOf(t.brand)]}));
+  },[filteredTotals]);
+
+  const trafficRevData=useMemo(()=>{
+    return [...filteredTotals].sort((a,b)=>b.traffic-a.traffic)
+      .map(t=>({brand:t.brand,traffic:t.traffic,rev:t.rev||0,color:COLORS[BRANDS.indexOf(t.brand)]}));
   },[filteredTotals]);
 
   const insights=useMemo(()=>{
@@ -827,6 +833,37 @@ function Dashboard(){
             </ScatterChart>
           </ResponsiveContainer>
           <BarLegend data={revConvData}/>
+        </div>
+      </div>
+
+      <div className="charts-grid-1">
+        <div className="chart-card">
+          <div className="chart-header">
+            <div>
+              <div className="chart-title"><span className="num-badge">13</span>브랜드별 Total Traffic 대비 매출 분석</div>
+              <div className="chart-subtitle">{period==='all'?'전체 기간':`${period}년`} 기준 · X축 트래픽, Y축 매출</div>
+            </div>
+            {insights && (
+              <div className="chart-header-insight" style={{flex:1,marginLeft:20}}>
+                {insights.sigRevTraffic?(()=>{const c=corrDesc(insights.corrRevTraffic); return <>트래픽과 매출 간에는 <span className="hl">{c.strength} {c.dir}의 상관관계</span>(r=<span className="hl">{insights.corrRevTraffic.toFixed(2)}</span>, p&lt;0.05)가 있어, {c.dir==='양'?'트래픽이 많은 브랜드일수록 매출도 높은 경향이 있습니다':'트래픽 규모와 매출이 반대로 움직이는 경향이 있습니다'}.</>;})():<>트래픽과 매출 간에 뚜렷한 상관관계는 보이지 않습니다.</>}
+              </div>
+            )}
+          </div>
+          <ResponsiveContainer width="100%" height={320}>
+            <ScatterChart margin={{left:20,right:30,top:20,bottom:20}}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#EAEAEA"/>
+              <XAxis type="number" dataKey="traffic" name="Total Traffic" tickFormatter={fmtK} tick={{fill:'#6E6E6E',fontSize:11}} axisLine={false} tickLine={false}
+                label={{value:'Total Traffic',position:'insideBottom',offset:-8,fontSize:11,fill:'#6E6E6E'}}/>
+              <YAxis type="number" dataKey="rev" name="Revenue" tickFormatter={fmtM} tick={{fill:'#6E6E6E',fontSize:11}} axisLine={false} tickLine={false}
+                label={{value:'Revenue',angle:-90,position:'insideLeft',fontSize:11,fill:'#6E6E6E'}}/>
+              <Tooltip content={<CustomScatterTooltip xKey="traffic" xLabel="Traffic" xFmt={fmtK} yKey="rev" yLabel="Revenue" yFmt={fmtM}/>} cursor={{strokeDasharray:'3 3'}}/>
+              <Scatter data={trafficRevData}>
+                {trafficRevData.map(d=><Cell key={d.brand} fill={d.color}/>)}
+                <LabelList dataKey="brand" position="top" style={{fontSize:11,fontWeight:600,fill:'var(--c-brown)'}}/>
+              </Scatter>
+            </ScatterChart>
+          </ResponsiveContainer>
+          <BarLegend data={trafficRevData}/>
         </div>
       </div>
     </div>
