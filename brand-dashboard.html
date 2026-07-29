@@ -105,6 +105,42 @@ const fmtM=n=>`$${(n/1e6).toFixed(1)}M`;
 const fmtK=n=>n>=1e6?`${(n/1e6).toFixed(1)}M`:n>=1e3?`${(n/1e3).toFixed(0)}K`:String(n);
 const fmtPct=n=>`${n.toFixed(1)}%`;
 
+const OS_COLOR_MAP={'Fire TV':'#A5023D','Tizen':'#9C9160','Roku':'#6E6E6E','SmartCast':'#dc496a','Google TV':'#C7BD91','WebOS':'#4a7c8c','기타/미상':'#cfcfcf'};
+const osColor=os=>OS_COLOR_MAP[os]||'#999999';
+
+const MODEL_TABLE_COLUMNS=[
+  {key:'brand',label:'Brand',sortable:false,align:'left'},
+  {key:'retailer_sku',label:'Retailer SKU',sortable:false,align:'left'},
+  {key:'model_number',label:'Model Number',sortable:false,align:'left'},
+  {key:'units_sold',label:'Unit Sold',sortable:true,align:'right'},
+  {key:'retail_sales',label:'Retail Sales',sortable:true,align:'right'},
+  {key:'conversion_rate',label:'Conversion Rate',sortable:true,align:'right'},
+  {key:'total_traffic',label:'Total Traffic',sortable:true,align:'right'},
+  {key:'organic_traffic',label:'Organic Traffic',sortable:true,align:'right'},
+  {key:'os',label:'O/S',sortable:false,align:'left'},
+];
+const fmtModelCell=(col,m)=>{
+  if(col.key==='retail_sales') return '$'+Math.round(m.retail_sales).toLocaleString();
+  if(col.key==='conversion_rate') return m.conversion_rate.toFixed(2)+'%';
+  if(col.key==='units_sold'||col.key==='total_traffic'||col.key==='organic_traffic') return m[col.key].toLocaleString();
+  return m[col.key];
+};
+
+function CustomOsPieTooltip({active,payload}){
+  if(!active||!payload||!payload.length) return null;
+  const d=payload[0];
+  return(
+    <div className="ctt">
+      <div className="ctt-item">
+        <div className="ctt-dot" style={{background:d.payload.fill}}/>
+        <span className="ctt-name">{d.name}</span>
+        <span className="ctt-val">{fmtK(d.value)}</span>
+      </div>
+      <div style={{color:'var(--c-gray-dark)',marginTop:4}}>{fmtPct(d.payload.pct)} share</div>
+    </div>
+  );
+}
+
 function pearson(xs,ys){
   const n=xs.length;
   if(n<3) return null;
@@ -424,7 +460,24 @@ function Dashboard(){
   const [totals,setTotals]=useState(null);
   const [loadError,setLoadError]=useState(null);
   const [chatWidth,setChatWidth]=useState(360);
+  const [osShare,setOsShare]=useState(null);
+  const [topModels,setTopModels]=useState(null);
+  const [modelSort,setModelSort]=useState('units_sold');
   const draggingRef=useRef(false);
+
+  useEffect(()=>{
+    fetch(`/api/os_share?period=${period}`).then(r=>r.json()).then(setOsShare).catch(()=>setOsShare([]));
+  },[period]);
+
+  useEffect(()=>{
+    fetch(`/api/top_models?period=${period}&sort=${modelSort}`).then(r=>r.json()).then(setTopModels).catch(()=>setTopModels([]));
+  },[period,modelSort]);
+
+  const osPieData=useMemo(()=>{
+    if(!osShare) return [];
+    const total=osShare.reduce((s,d)=>s+d.units,0);
+    return osShare.map(d=>({name:d.os,value:d.units,pct:total?d.units/total*100:0,fill:osColor(d.os)}));
+  },[osShare]);
 
   useEffect(()=>{
     const onMove=e=>{
@@ -1099,6 +1152,78 @@ function Dashboard(){
             </ScatterChart>
           </ResponsiveContainer>
           <BarLegend data={trafficRevData}/>
+        </div>
+      </div>
+
+      <div className="charts-grid-1">
+        <div className="chart-card">
+          <div className="chart-header">
+            <div>
+              <div className="chart-title"><span className="num-badge">14</span>OS별 점유율</div>
+              <div className="chart-subtitle">{period==='all'?'전체 기간':`${period}년`} 기준 · 10개 브랜드 판매량(Units Sold) 기준</div>
+            </div>
+            {osPieData.length>0 && (
+              <div className="chart-header-insight" style={{flex:1,marginLeft:20}}>
+                <span className="hl">{osPieData[0].name}</span>이 <span className="hl">{fmtPct(osPieData[0].pct)}</span>로 가장 큰 비중을 차지하며, 상위 3개 OS가 전체의 <span className="hl">{fmtPct(osPieData.slice(0,3).reduce((s,d)=>s+d.pct,0))}</span>를 차지합니다.
+              </div>
+            )}
+          </div>
+          <ResponsiveContainer width="100%" height={320}>
+            <PieChart>
+              <Pie data={osPieData} cx="50%" cy="50%" innerRadius={70} outerRadius={130}
+                dataKey="value" nameKey="name" paddingAngle={2} labelLine={false}
+                label={(props)=>{
+                  const {cx,cy,midAngle,outerRadius,index}=props;
+                  if(index!==0 && index!==osPieData.length-1) return null;
+                  const RADIAN=Math.PI/180;
+                  const radius=outerRadius+18;
+                  const x=cx+radius*Math.cos(-midAngle*RADIAN);
+                  const y=cy+radius*Math.sin(-midAngle*RADIAN);
+                  return <text x={x} y={y} fill="var(--c-brown)" fontSize={11} fontWeight={700} textAnchor={x>cx?'start':'end'} dominantBaseline="central">{fmtK(osPieData[index].value)}</text>;
+                }}>
+                {osPieData.map((d,i)=><Cell key={d.name} fill={d.fill}/>)}
+              </Pie>
+              <Tooltip content={<CustomOsPieTooltip/>}/>
+              <Legend iconType="circle" iconSize={9} formatter={(v)=><span style={{fontSize:12,color:'#47422E'}}>{v}</span>}/>
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      <div className="charts-grid-1">
+        <div className="chart-card">
+          <div className="chart-header">
+            <div>
+              <div className="chart-title"><span className="num-badge">15</span>모델별 상세</div>
+              <div className="chart-subtitle">{period==='all'?'전체 기간':`${period}년`} 기준 · {MODEL_TABLE_COLUMNS.find(c=>c.key===modelSort).label} 기준 내림차순 상위 15개 · 컬럼명을 클릭하면 기준이 바뀝니다</div>
+            </div>
+          </div>
+          <div style={{overflowX:'auto'}}>
+            <table style={{borderCollapse:'collapse',width:'100%',fontSize:12}}>
+              <thead>
+                <tr>
+                  {MODEL_TABLE_COLUMNS.map(col=>(
+                    <th key={col.key}
+                        onClick={col.sortable?()=>setModelSort(col.key):undefined}
+                        style={{textAlign:col.align,padding:'8px 10px',borderBottom:'2px solid var(--c-khaki)',color:col.sortable&&modelSort===col.key?'var(--c-red)':'var(--c-gray-dark)',whiteSpace:'nowrap',cursor:col.sortable?'pointer':'default',userSelect:'none',fontWeight:600}}>
+                      {col.label}{col.sortable&&modelSort===col.key?' ▼':''}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {(topModels||[]).map((m,i)=>(
+                  <tr key={m.retailer_sku+'_'+i} style={{borderBottom:'1px solid var(--c-gray-light)'}}>
+                    {MODEL_TABLE_COLUMNS.map(col=>(
+                      <td key={col.key} style={{padding:'7px 10px',textAlign:col.align,whiteSpace:'nowrap',fontWeight:col.sortable&&modelSort===col.key?700:400}}>{fmtModelCell(col,m)}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {!topModels && <div style={{padding:'14px 4px',color:'var(--c-gray-dark)',fontSize:12}}>불러오는 중...</div>}
+            {topModels&&topModels.length===0 && <div style={{padding:'14px 4px',color:'var(--c-gray-dark)',fontSize:12}}>표시할 데이터가 없습니다.</div>}
+          </div>
         </div>
       </div>
     </div>

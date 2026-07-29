@@ -216,6 +216,92 @@ def totals():
     return result
 
 
+def period_where(period: str):
+    """Returns (sql_clause, params) filtering sku_weekly.week_id to a year, or ('', []) for 'all'."""
+    if period == "all":
+        return "", []
+    if not re.fullmatch(r"\d{4}", period):
+        raise HTTPException(400, "잘못된 period 값입니다.")
+    return "WHERE week_id / 100 = ?", [int(period)]
+
+
+OS_LABELS = {"os_-": "기타/미상"}
+
+TOP_MODELS_SORT_COLUMNS = {
+    "units_sold": "units_sold",
+    "retail_sales": "retail_sales",
+    "conversion_rate": "conversion_rate",
+    "total_traffic": "total_traffic",
+    "organic_traffic": "organic_traffic",
+}
+
+
+@app.get("/api/os_share")
+def os_share(period: str = "all"):
+    where_clause, params = period_where(period)
+    conn = get_conn()
+    rows = conn.execute(
+        f"""
+        SELECT os, SUM(units_sold) AS units
+        FROM sku_weekly
+        {where_clause}
+        GROUP BY os
+        ORDER BY units DESC
+        """,
+        params,
+    ).fetchall()
+    conn.close()
+    return [{"os": OS_LABELS.get(r["os"], r["os"] or "기타/미상"), "units": r["units"]} for r in rows]
+
+
+@app.get("/api/top_models")
+def top_models(period: str = "all", sort: str = "units_sold", limit: int = 15):
+    sort_col = TOP_MODELS_SORT_COLUMNS.get(sort)
+    if sort_col is None:
+        raise HTTPException(400, "잘못된 sort 값입니다.")
+    limit = max(1, min(limit, 100))
+    where_clause, params = period_where(period)
+
+    conn = get_conn()
+    rows = conn.execute(
+        f"""
+        SELECT
+            MAX(brand) AS brand,
+            retailer_sku,
+            MAX(model_number) AS model_number,
+            MAX(os) AS os,
+            SUM(units_sold) AS units_sold,
+            SUM(retail_sales) AS retail_sales,
+            SUM(total_traffic) AS total_traffic,
+            SUM(organic_traffic) AS organic_traffic,
+            CASE WHEN SUM(total_traffic) > 0
+                 THEN SUM(units_sold) * 100.0 / SUM(total_traffic)
+                 ELSE 0 END AS conversion_rate
+        FROM sku_weekly
+        {where_clause}
+        GROUP BY retailer_sku
+        ORDER BY {sort_col} DESC
+        LIMIT ?
+        """,
+        params + [limit],
+    ).fetchall()
+    conn.close()
+    return [
+        {
+            "brand": r["brand"],
+            "retailer_sku": r["retailer_sku"],
+            "model_number": r["model_number"] or "-",
+            "units_sold": r["units_sold"],
+            "retail_sales": round(r["retail_sales"], 2),
+            "conversion_rate": round(r["conversion_rate"], 2),
+            "total_traffic": r["total_traffic"],
+            "organic_traffic": r["organic_traffic"],
+            "os": OS_LABELS.get(r["os"], r["os"] or "기타/미상"),
+        }
+        for r in rows
+    ]
+
+
 def call_chat_model(client: OpenAI, messages: list):
     attempts = [
         dict(model=f"{CHAT_MODEL}:online", messages=messages, response_format={"type": "json_object"}),
