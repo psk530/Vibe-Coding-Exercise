@@ -37,6 +37,10 @@ body{background:var(--c-cream);color:var(--c-brown);font-family:-apple-system,Bl
 .chat-msg.bot{align-self:flex-start;background:var(--c-pink);color:var(--c-brown);border-bottom-left-radius:2px}
 .chat-msg.error{align-self:flex-start;background:#fde8e8;color:var(--c-red);border-bottom-left-radius:2px}
 .chat-msg.pending{align-self:flex-start;background:var(--c-pink);color:var(--c-gray-dark);font-style:italic}
+.chat-suggestions{display:flex;flex-direction:column;gap:6px;padding:10px 16px;border-top:1px solid var(--c-gray-light);flex-shrink:0}
+.chat-suggestion-chip{text-align:left;background:var(--c-pink);border:1px solid var(--c-gray-light);border-radius:8px;padding:6px 10px;font-size:11.5px;color:var(--c-brown);cursor:pointer;transition:background .15s}
+.chat-suggestion-chip:hover{background:#f8dde4}
+.chat-suggestion-chip:disabled{opacity:.5;cursor:default}
 .chat-input-row{display:flex;gap:8px;padding:14px 16px;border-top:1px solid var(--c-gray-light);flex-shrink:0}
 .chat-input{flex:1;border:1px solid var(--c-gray-light);border-radius:8px;padding:8px 12px;font-size:13px;resize:none;outline:none;font-family:inherit}
 .chat-input:focus{border-color:var(--c-red)}
@@ -240,6 +244,84 @@ function CorrBadge({r}){
 
 const CHAT_STAGES=['질문을 분석하고 있어요...','대시보드 데이터를 조회하고 있어요...','관련 정보를 검색하고 있어요...','답변을 정리하고 있어요...'];
 
+const SUGGESTED_QUESTIONS=[
+  '브랜드별 매출과 전환율을 표로 비교해줘',
+  '최근 3개월간 삼성과 LG의 매출 추이를 차트로 보여줘',
+  '전환율이 가장 낮은 브랜드는 어디이고, 개선하려면 어떤 점을 봐야 할까?',
+];
+
+const CHAT_CHART_COLORS=['#A5023D','#9C9160','#C7BD91','#6E6E6E','#dc496a'];
+
+function flattenBlocks(blocks){
+  return blocks.map(b=>{
+    if(b.type==='table'){
+      const head=b.headers.join(' | ');
+      const rows=b.rows.map(r=>r.join(' | ')).join('\n');
+      return (b.title?b.title+'\n':'')+head+'\n'+rows;
+    }
+    if(b.type==='chart'){
+      return b.title||'차트';
+    }
+    return b.content||'';
+  }).join('\n\n');
+}
+
+function ChatBlocks({blocks}){
+  return (
+    <>
+      {blocks.map((b,i)=>{
+        if(b.type==='table'){
+          return (
+            <div key={i} style={{margin:i===0?'0 0 6px':'6px 0',overflowX:'auto'}}>
+              {b.title && <div style={{fontSize:11,fontWeight:700,color:'var(--c-olive)',marginBottom:4}}>{b.title}</div>}
+              <table style={{borderCollapse:'collapse',fontSize:11,width:'100%'}}>
+                <thead>
+                  <tr>{b.headers.map((h,hi)=><th key={hi} style={{textAlign:'left',padding:'4px 8px',borderBottom:'1px solid var(--c-gray-light)',color:'var(--c-gray-dark)',whiteSpace:'nowrap'}}>{h}</th>)}</tr>
+                </thead>
+                <tbody>
+                  {b.rows.map((row,ri)=>(
+                    <tr key={ri}>{row.map((c,ci)=><td key={ci} style={{padding:'4px 8px',borderBottom:'1px solid var(--c-gray-light)',whiteSpace:'nowrap'}}>{c}</td>)}</tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        }
+        if(b.type==='chart'){
+          const series=(b.series&&b.series.length)?b.series:[{key:'value',name:'값'}];
+          return (
+            <div key={i} style={{margin:i===0?'0 0 6px':'6px 0'}}>
+              {b.title && <div style={{fontSize:11,fontWeight:700,color:'var(--c-olive)',marginBottom:4}}>{b.title}</div>}
+              <ResponsiveContainer width="100%" height={180}>
+                {b.chartType==='line'?(
+                  <LineChart data={b.data} margin={{top:5,right:10,left:0,bottom:5}}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#EAEAEA"/>
+                    <XAxis dataKey={b.xKey||'label'} tick={{fontSize:10,fill:'#6E6E6E'}} axisLine={false} tickLine={false}/>
+                    <YAxis tick={{fontSize:10,fill:'#6E6E6E'}} axisLine={false} tickLine={false} width={40}/>
+                    <Tooltip contentStyle={{fontSize:11}}/>
+                    {series.length>1 && <Legend wrapperStyle={{fontSize:10}}/>}
+                    {series.map((s,si)=><Line key={s.key} type="monotone" dataKey={s.key} name={s.name||s.key} stroke={CHAT_CHART_COLORS[si%CHAT_CHART_COLORS.length]} strokeWidth={2} dot={{r:2}}/>)}
+                  </LineChart>
+                ):(
+                  <BarChart data={b.data} margin={{top:5,right:10,left:0,bottom:5}}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#EAEAEA"/>
+                    <XAxis dataKey={b.xKey||'label'} tick={{fontSize:10,fill:'#6E6E6E'}} axisLine={false} tickLine={false}/>
+                    <YAxis tick={{fontSize:10,fill:'#6E6E6E'}} axisLine={false} tickLine={false} width={40}/>
+                    <Tooltip contentStyle={{fontSize:11}}/>
+                    {series.length>1 && <Legend wrapperStyle={{fontSize:10}}/>}
+                    {series.map((s,si)=><Bar key={s.key} dataKey={s.key} name={s.name||s.key} fill={CHAT_CHART_COLORS[si%CHAT_CHART_COLORS.length]}/>)}
+                  </BarChart>
+                )}
+              </ResponsiveContainer>
+            </div>
+          );
+        }
+        return <div key={i} style={{whiteSpace:'pre-wrap',margin:i===0?0:'6px 0 0'}}>{b.content}</div>;
+      })}
+    </>
+  );
+}
+
 function ChatPanel(){
   const [messages,setMessages]=useState([]);
   const [input,setInput]=useState('');
@@ -254,8 +336,7 @@ function ChatPanel(){
 
   useEffect(()=>()=>clearInterval(stageTimerRef.current),[]);
 
-  const send=()=>{
-    const text=input.trim();
+  const sendText=(text)=>{
     if(!text||sending) return;
     const history=messages.slice(-10).map(m=>({role:m.role,content:m.content}));
     setMessages(prev=>[...prev,{role:'user',content:text}]);
@@ -273,7 +354,8 @@ function ChatPanel(){
       if(!r.ok) throw new Error('서버 오류 ('+r.status+')');
       return r.json();
     }).then(data=>{
-      setMessages(prev=>[...prev,{role:'assistant',content:data.reply}]);
+      const blocks=Array.isArray(data.blocks)&&data.blocks.length?data.blocks:[{type:'text',content:'답변을 생성하지 못했습니다.'}];
+      setMessages(prev=>[...prev,{role:'assistant',content:flattenBlocks(blocks),blocks}]);
     }).catch(e=>{
       setMessages(prev=>[...prev,{role:'assistant',content:'답변을 가져오지 못했습니다: '+e.message,error:true}]);
     }).finally(()=>{
@@ -281,6 +363,8 @@ function ChatPanel(){
       setSending(false);
     });
   };
+
+  const send=()=>sendText(input.trim());
 
   const onKeyDown=e=>{
     if(e.key==='Enter'&&!e.shiftKey){
@@ -294,18 +378,22 @@ function ChatPanel(){
       <div className="chat-header">Insight Finder</div>
       {messages.length===0 && (
         <div className="chat-empty-hint">
-          왼쪽 대시보드 데이터에 대해 질문해 보세요.<br/>
-          예시:<br/>
-          · "25년 20주차 삼성 매출과 트래픽 알려줘"<br/>
-          · "25년 10주차 삼성 트래픽이 갑자기 오른 이유가 뭐야?"
+          왼쪽 대시보드 데이터에 대해 질문해 보세요. 아래 추천 질문을 눌러보거나 직접 입력할 수 있어요.
         </div>
       )}
       <div className="chat-messages">
         {messages.map((m,i)=>(
-          <div key={i} className={"chat-msg "+(m.role==='user'?'user':m.error?'error':'bot')}>{m.content}</div>
+          <div key={i} className={"chat-msg "+(m.role==='user'?'user':m.error?'error':'bot')}>
+            {m.role==='assistant'&&m.blocks?<ChatBlocks blocks={m.blocks}/>:m.content}
+          </div>
         ))}
         {sending && <div className="chat-msg pending">{CHAT_STAGES[stageIdx]}</div>}
         <div ref={bottomRef}/>
+      </div>
+      <div className="chat-suggestions">
+        {SUGGESTED_QUESTIONS.map((q,i)=>(
+          <button key={i} className="chat-suggestion-chip" onClick={()=>sendText(q)} disabled={sending}>{q}</button>
+        ))}
       </div>
       <div className="chat-input-row">
         <textarea className="chat-input" rows={2} value={input}
