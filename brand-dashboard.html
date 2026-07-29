@@ -224,7 +224,7 @@ function CustomTooltip({active,payload,label,metric}){
 
 function BarLegend({data}){
   return (
-    <div style={{display:'flex',flexWrap:'wrap',gap:'4px 12px',marginTop:10,paddingTop:10,borderTop:'1px solid var(--c-gray-light)'}}>
+    <div style={{display:'flex',flexWrap:'wrap',justifyContent:'center',gap:'4px 12px',marginTop:10,paddingTop:10,borderTop:'1px solid var(--c-gray-light)'}}>
       {data.map((d,i)=>(
         <div key={d.brand||d.name||i} style={{display:'flex',alignItems:'center',gap:5}}>
           <div style={{width:8,height:8,borderRadius:'50%',background:d.color||d.fill,flexShrink:0}}/>
@@ -762,7 +762,7 @@ function Dashboard(){
         <div className="chart-card" style={{marginBottom:16}}>
           <div className="chart-header">
             <div>
-              <div className="insight-summary-badge">Insight Summary</div>
+              <div className="insight-summary-badge">Dashboard Summary</div>
               <div className="chart-subtitle" style={{marginLeft:0,marginTop:6}}>{insights.periodLabel} · 선택 브랜드 {insights.count}개 기준 자동 생성</div>
             </div>
           </div>
