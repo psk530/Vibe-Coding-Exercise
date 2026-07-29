@@ -52,7 +52,8 @@ week 컬럼은 YYYYWW 형식입니다 (예: 202520 = 2025년 20주차). conv(전
     {{"type": "text", "content": "설명 문장"}},
     {{"type": "table", "title": "표 제목(선택, 없으면 빈 문자열)", "headers": ["열1", "열2"], "rows": [["값1", "값2"]]}},
     {{"type": "chart", "chartType": "bar 또는 line", "title": "차트 제목(선택)", "xKey": "label", "series": [{{"key": "value", "name": "계열 이름"}}], "data": [{{"label": "202519", "value": 12345}}]}}
-  ]
+  ],
+  "suggestions": ["팔로우업 질문1", "팔로우업 질문2", "팔로우업 질문3"]
 }}
 
 블록 작성 규칙:
@@ -66,7 +67,11 @@ week 컬럼은 YYYYWW 형식입니다 (예: 202520 = 2025년 20주차). conv(전
    한 답변 안에 여러 블록을 섞어 써도 됩니다 (예: text로 요약 → table/chart로 세부 수치 → text로 결론).
 4. chart 블록의 data 안 숫자 값(value 등 series의 key에 해당하는 값)은 반드시 순수 숫자로 넣으세요 (문자열 금지).
 5. 답변은 간결한 한국어로 작성하고, 확실한 사실과 추정을 구분해서 표현하세요 (예: "~로 추정됩니다").
-6. text/table의 문자열 안에는 #, *, **, -, |, `, > 같은 마크다운 기호나 이모지를 쓰지 마세요. 강조하고 싶어도 별표 없이 평문으로 쓰세요.
+6. text/table 문자열 안에서 사용자가 꼭 봐야 할 핵심 수치나 결론(최고/최저 값, 핵심 인사이트 등)은 **핵심내용**처럼 별표 두 개로 감싸서 강조하세요.
+   이 강조 표시는 채팅창에서 초록색 굵은 글씨로 표시됩니다. 문장 전체를 감싸지 말고, 정말 중요한 숫자나 결론 한둘만 강조하세요.
+   그 외 #, 별표 하나(*), -, |, `, > 같은 마크다운 기호나 이모지는 절대 쓰지 마세요.
+7. suggestions에는 이번 답변과 지금까지의 대화 맥락을 고려했을 때 사용자가 다음으로 물어보면 유용할 구체적인 질문 3개를 만드세요.
+   데이터로 답할 수 있거나 추가 분석이 가능한, 실용적인 질문으로 작성하고, 이미 방금 답한 내용을 그대로 반복하는 질문은 피하세요.
 
 데이터(CSV):
 {data_csv}
@@ -84,8 +89,10 @@ class ChatRequest(BaseModel):
 
 
 def strip_markdown(text: str) -> str:
+    # NOTE: **bold** is intentionally left intact — the frontend renders it as
+    # a green highlight span (see rule 6 in CHAT_SYSTEM_TEMPLATE). Every other
+    # markdown construct is stripped since the chat panel shows raw text.
     text = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'\1 (\2)', text)
-    text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
     text = re.sub(r'__(.+?)__', r'\1', text)
     text = re.sub(r'(?<!\*)\*([^\*\n]+?)\*(?!\*)', r'\1', text)
     text = re.sub(r'`([^`]+)`', r'\1', text)
@@ -95,14 +102,22 @@ def strip_markdown(text: str) -> str:
     return text
 
 
-def parse_blocks(raw: str) -> list:
+DEFAULT_SUGGESTIONS = [
+    "브랜드별 매출과 전환율을 표로 비교해줘",
+    "최근 3개월간 삼성과 LG의 매출 추이를 차트로 보여줘",
+    "전환율이 가장 낮은 브랜드는 어디이고, 개선하려면 어떤 점을 봐야 할까?",
+]
+
+
+def parse_chat_response(raw: str):
     try:
         obj = json.loads(raw)
-        blocks = obj.get("blocks")
-        if not isinstance(blocks, list) or not blocks:
-            raise ValueError("no blocks in response")
     except Exception:
-        return [{"type": "text", "content": strip_markdown(raw or "")}]
+        return [{"type": "text", "content": strip_markdown(raw or "")}], DEFAULT_SUGGESTIONS
+
+    blocks = obj.get("blocks")
+    if not isinstance(blocks, list):
+        blocks = []
 
     cleaned = []
     for b in blocks:
@@ -135,7 +150,15 @@ def parse_blocks(raw: str) -> list:
                     "series": series,
                     "data": data,
                 })
-    return cleaned or [{"type": "text", "content": "답변을 생성하지 못했습니다."}]
+    cleaned = cleaned or [{"type": "text", "content": "답변을 생성하지 못했습니다."}]
+
+    suggestions = []
+    for s in (obj.get("suggestions") or []):
+        if isinstance(s, str) and s.strip():
+            suggestions.append(strip_markdown(s.strip()))
+    suggestions = suggestions[:3] or DEFAULT_SUGGESTIONS
+
+    return cleaned, suggestions
 
 
 def build_data_csv() -> str:
@@ -224,7 +247,8 @@ def chat(req: ChatRequest):
         raise HTTPException(500, "AI 응답 생성 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.")
 
     raw = resp.choices[0].message.content
-    return {"blocks": parse_blocks(raw)}
+    blocks, suggestions = parse_chat_response(raw)
+    return {"blocks": blocks, "suggestions": suggestions}
 
 
 @app.get("/")

@@ -252,6 +252,14 @@ const SUGGESTED_QUESTIONS=[
 
 const CHAT_CHART_COLORS=['#A5023D','#9C9160','#C7BD91','#6E6E6E','#dc496a'];
 
+function renderHighlighted(text){
+  if(!text) return text;
+  return String(text).split(/(\*\*.+?\*\*)/g).map((part,i)=>{
+    const m=part.match(/^\*\*(.+)\*\*$/);
+    return m ? <span key={i} className="hl">{m[1]}</span> : part;
+  });
+}
+
 function flattenBlocks(blocks){
   return blocks.map(b=>{
     if(b.type==='table'){
@@ -280,7 +288,7 @@ function ChatBlocks({blocks}){
                 </thead>
                 <tbody>
                   {b.rows.map((row,ri)=>(
-                    <tr key={ri}>{row.map((c,ci)=><td key={ci} style={{padding:'4px 8px',borderBottom:'1px solid var(--c-gray-light)',whiteSpace:'nowrap'}}>{c}</td>)}</tr>
+                    <tr key={ri}>{row.map((c,ci)=><td key={ci} style={{padding:'4px 8px',borderBottom:'1px solid var(--c-gray-light)',whiteSpace:'nowrap'}}>{renderHighlighted(c)}</td>)}</tr>
                   ))}
                 </tbody>
               </table>
@@ -316,7 +324,7 @@ function ChatBlocks({blocks}){
             </div>
           );
         }
-        return <div key={i} style={{whiteSpace:'pre-wrap',margin:i===0?0:'6px 0 0'}}>{b.content}</div>;
+        return <div key={i} style={{whiteSpace:'pre-wrap',margin:i===0?0:'6px 0 0'}}>{renderHighlighted(b.content)}</div>;
       })}
     </>
   );
@@ -327,6 +335,7 @@ function ChatPanel(){
   const [input,setInput]=useState('');
   const [sending,setSending]=useState(false);
   const [stageIdx,setStageIdx]=useState(0);
+  const [suggestions,setSuggestions]=useState(SUGGESTED_QUESTIONS);
   const bottomRef=useRef(null);
   const stageTimerRef=useRef(null);
 
@@ -356,6 +365,7 @@ function ChatPanel(){
     }).then(data=>{
       const blocks=Array.isArray(data.blocks)&&data.blocks.length?data.blocks:[{type:'text',content:'답변을 생성하지 못했습니다.'}];
       setMessages(prev=>[...prev,{role:'assistant',content:flattenBlocks(blocks),blocks}]);
+      if(Array.isArray(data.suggestions)&&data.suggestions.length) setSuggestions(data.suggestions);
     }).catch(e=>{
       setMessages(prev=>[...prev,{role:'assistant',content:'답변을 가져오지 못했습니다: '+e.message,error:true}]);
     }).finally(()=>{
@@ -391,7 +401,7 @@ function ChatPanel(){
         <div ref={bottomRef}/>
       </div>
       <div className="chat-suggestions">
-        {SUGGESTED_QUESTIONS.map((q,i)=>(
+        {suggestions.map((q,i)=>(
           <button key={i} className="chat-suggestion-chip" onClick={()=>sendText(q)} disabled={sending}>{q}</button>
         ))}
       </div>
