@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: brand-dashboard
+    env: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt && python etl/load_excel_to_db.py"
+    startCommand: "uvicorn server.main:app --host 0.0.0.0 --port $PORT"
