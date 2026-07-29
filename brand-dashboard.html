@@ -441,7 +441,8 @@ ${question}
 
 [답변]
 ${answerText}`;
-    window.location.href='mailto:sangkee.park@concentrix.com?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
+    const outlookUrl='https://outlook.office.com/mail/deeplink/compose?to='+encodeURIComponent('sangkee.park@concentrix.com')+'&subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
+    window.open(outlookUrl,'_blank');
   };
 
   const onKeyDown=e=>{
