@@ -41,6 +41,8 @@ body{background:var(--c-cream);color:var(--c-brown);font-family:-apple-system,Bl
 .chat-suggestion-chip{text-align:left;background:var(--c-pink);border:1px solid var(--c-gray-light);border-radius:8px;padding:6px 10px;font-size:11.5px;color:var(--c-brown);cursor:pointer;transition:background .15s}
 .chat-suggestion-chip:hover{background:#f8dde4}
 .chat-suggestion-chip:disabled{opacity:.5;cursor:default}
+.chat-mail-btn{align-self:flex-start;display:inline-flex;align-items:center;gap:5px;background:none;border:none;cursor:pointer;padding:0;margin-top:-4px;color:var(--c-gray-dark);font-size:11px}
+.chat-mail-btn:hover{color:var(--c-red)}
 .chat-input-row{display:flex;gap:8px;padding:14px 16px;border-top:1px solid var(--c-gray-light);flex-shrink:0}
 .chat-input{flex:1;border:1px solid var(--c-gray-light);border-radius:8px;padding:8px 12px;font-size:13px;resize:none;outline:none;font-family:inherit}
 .chat-input:focus{border-color:var(--c-red)}
@@ -367,7 +369,16 @@ function ChatBlocks({blocks}){
   );
 }
 
-function ChatPanel(){
+function MailIcon(){
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="4" width="20" height="16" rx="2"/>
+      <path d="m22 6-10 7L2 6"/>
+    </svg>
+  );
+}
+
+function ChatPanel({period,sel}){
   const [messages,setMessages]=useState([]);
   const [input,setInput]=useState('');
   const [sending,setSending]=useState(false);
@@ -413,6 +424,26 @@ function ChatPanel(){
 
   const send=()=>sendText(input.trim());
 
+  const sendMail=(question,answerText)=>{
+    const viewedAt=new Date().toLocaleString('ko-KR',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+    const periodLabel=period==='all'?'전체 (2024–2026)':`${period}년`;
+    const brandsLabel=sel&&sel.size===BRANDS.length?'전체 브랜드':(sel?[...sel].join(', '):'-');
+    const subject='[Brand Dashboard Insight] '+(question.length>60?question.slice(0,60)+'...':question);
+    const body=
+`본 메일은 'US TV Market - Brand Competition Dashboard'에서 발굴된 인사이트를 공유하기 위해 발송되었습니다.
+
+[조회 정보]
+조회 시점: ${viewedAt}
+조회 조건: 기간 ${periodLabel} / 브랜드 ${brandsLabel}
+
+[질의]
+${question}
+
+[답변]
+${answerText}`;
+    window.location.href='mailto:sangkee.park@concentrix.com?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
+  };
+
   const onKeyDown=e=>{
     if(e.key==='Enter'&&!e.shiftKey){
       e.preventDefault();
@@ -430,9 +461,16 @@ function ChatPanel(){
       )}
       <div className="chat-messages">
         {messages.map((m,i)=>(
-          <div key={i} className={"chat-msg "+(m.role==='user'?'user':m.error?'error':'bot')}>
-            {m.role==='assistant'&&m.blocks?<ChatBlocks blocks={m.blocks}/>:m.content}
-          </div>
+          <React.Fragment key={i}>
+            <div className={"chat-msg "+(m.role==='user'?'user':m.error?'error':'bot')}>
+              {m.role==='assistant'&&m.blocks?<ChatBlocks blocks={m.blocks}/>:m.content}
+            </div>
+            {m.role==='assistant'&&!m.error&&i>0&&messages[i-1].role==='user'&&(
+              <button className="chat-mail-btn" onClick={()=>sendMail(messages[i-1].content,m.content)} title="이 질의와 답변을 메일로 보내기">
+                <MailIcon/><span>메일로 보내기</span>
+              </button>
+            )}
+          </React.Fragment>
         ))}
         {sending && <div className="chat-msg pending">{CHAT_STAGES[stageIdx]}</div>}
         <div ref={bottomRef}/>
@@ -1254,7 +1292,7 @@ function Dashboard(){
     </div>
     <div className="resize-handle" onMouseDown={onHandleMouseDown}/>
     <div className="chat-col" style={{width:chatWidth}}>
-      <ChatPanel/>
+      <ChatPanel period={period} sel={sel}/>
     </div>
     </div>
   );
