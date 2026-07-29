@@ -211,6 +211,15 @@ function CustomScatterTooltip({active,payload,xKey,xLabel,xFmt,yKey,yLabel,yFmt}
   );
 }
 
+function CorrBadge({r}){
+  if(r==null) return null;
+  return (
+    <div style={{position:'absolute',top:8,right:8,background:'#fff',border:'1px solid var(--c-khaki)',borderRadius:8,padding:'6px 10px',textAlign:'center',boxShadow:'0 1px 3px rgba(71,66,46,.10)'}}>
+      <div style={{fontSize:12,fontWeight:800,color:'var(--c-brown)',whiteSpace:'nowrap'}}>상관계수: {r.toFixed(2)}</div>
+    </div>
+  );
+}
+
 function Dashboard(){
   const [sel,setSel]=useState(new Set(BRANDS));
   const [period,setPeriod]=useState('all');
@@ -482,17 +491,17 @@ function Dashboard(){
             </div>
             {insights.sigRevTraffic && (()=>{const c=corrDesc(insights.corrRevTraffic); return (
               <div className="insight-item">
-                매출과 트래픽 간에는 <span className="hl">{c.strength} {c.dir}의 상관관계</span>(r=<span className="hl">{insights.corrRevTraffic.toFixed(2)}</span>, p&lt;0.05)가 나타나, {c.dir==='양'?'트래픽이 많은 브랜드일수록 매출도 높은 경향이 있습니다':'트래픽 규모와 매출 순위가 반대로 움직이는 경향이 있습니다'}.
+                매출과 트래픽 간에는 <span className="hl">{c.strength} {c.dir}의 상관관계</span>(상관계수 <span className="hl">{insights.corrRevTraffic.toFixed(2)}</span>, p&lt;0.05)가 나타나, {c.dir==='양'?'트래픽이 많은 브랜드일수록 매출도 높은 경향이 있습니다':'트래픽 규모와 매출 순위가 반대로 움직이는 경향이 있습니다'}.
               </div>
             );})()}
             {insights.sigTrafficConv && (()=>{const c=corrDesc(insights.corrTrafficConv); return (
               <div className="insight-item">
-                트래픽과 전환율 간에는 <span className="hl">{c.strength} {c.dir}의 상관관계</span>(r=<span className="hl">{insights.corrTrafficConv.toFixed(2)}</span>, p&lt;0.05)를 보여, {c.dir==='양'?'트래픽이 많을수록 전환율도 함께 높아지는 경향이 있습니다':'트래픽이 많다고 반드시 전환율이 높은 것은 아니며, 브랜드별 트래픽 대비 전환 효율 편차가 큽니다'}.
+                트래픽과 전환율 간에는 <span className="hl">{c.strength} {c.dir}의 상관관계</span>(상관계수 <span className="hl">{insights.corrTrafficConv.toFixed(2)}</span>, p&lt;0.05)를 보여, {c.dir==='양'?'트래픽이 많을수록 전환율도 함께 높아지는 경향이 있습니다':'트래픽이 많다고 반드시 전환율이 높은 것은 아니며, 브랜드별 트래픽 대비 전환 효율 편차가 큽니다'}.
               </div>
             );})()}
             {insights.sigRevConv && (()=>{const c=corrDesc(insights.corrRevConv); return (
               <div className="insight-item">
-                매출과 전환율 간에는 <span className="hl">{c.strength} {c.dir}의 상관관계</span>(r=<span className="hl">{insights.corrRevConv.toFixed(2)}</span>, p&lt;0.05)를 보여, {c.dir==='양'?'전환율이 높은 브랜드일수록 매출도 높은 경향이 있습니다':'매출이 높다고 전환 효율까지 높은 것은 아닙니다'}.
+                매출과 전환율 간에는 <span className="hl">{c.strength} {c.dir}의 상관관계</span>(상관계수 <span className="hl">{insights.corrRevConv.toFixed(2)}</span>, p&lt;0.05)를 보여, {c.dir==='양'?'전환율이 높은 브랜드일수록 매출도 높은 경향이 있습니다':'매출이 높다고 전환 효율까지 높은 것은 아닙니다'}.
               </div>
             );})()}
             {!insights.sigRevTraffic && !insights.sigTrafficConv && !insights.sigRevConv && (
@@ -782,25 +791,28 @@ function Dashboard(){
             </div>
             {insights && (
               <div className="chart-header-insight" style={{flex:1,marginLeft:20}}>
-                {insights.sigTrafficConv?(()=>{const c=corrDesc(insights.corrTrafficConv); return <>트래픽과 전환율 간에는 <span className="hl">{c.strength} {c.dir}의 상관관계</span>(r=<span className="hl">{insights.corrTrafficConv.toFixed(2)}</span>)가 있어, {c.dir==='양'?'트래픽이 많을수록 전환율도 높아지는 경향이 있습니다':'트래픽이 많다고 전환율이 높은 것은 아닙니다'}.</>;})():<>트래픽과 전환율 간에 뚜렷한 상관관계는 보이지 않아, 브랜드별 효율 편차가 큽니다.</>}
+                {insights.sigTrafficConv?(()=>{const c=corrDesc(insights.corrTrafficConv); return <>트래픽과 전환율 간에는 <span className="hl">{c.strength} {c.dir}의 상관관계</span>(상관계수 <span className="hl">{insights.corrTrafficConv.toFixed(2)}</span>)가 있어, {c.dir==='양'?'트래픽이 많을수록 전환율도 높아지는 경향이 있습니다':'트래픽이 많다고 전환율이 높은 것은 아닙니다'}.</>;})():<>트래픽과 전환율 간에 뚜렷한 상관관계는 보이지 않아, 브랜드별 효율 편차가 큽니다.</>}
                 {insights.inefficient && <> 특히 <span className="hl">{insights.inefficient.brand}</span>는 트래픽 대비 전환 효율 개선의 여지가 있습니다.</>}
               </div>
             )}
           </div>
-          <ResponsiveContainer width="100%" height={320}>
-            <ScatterChart margin={{left:20,right:30,top:20,bottom:20}}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#EAEAEA"/>
-              <XAxis type="number" dataKey="traffic" name="Total Traffic" tickFormatter={fmtK} tick={{fill:'#6E6E6E',fontSize:11}} axisLine={false} tickLine={false}
-                label={{value:'Total Traffic',position:'insideBottom',offset:-8,fontSize:11,fill:'#6E6E6E'}}/>
-              <YAxis type="number" dataKey="conv" name="Conversion Rate" tickFormatter={v=>v+'%'} tick={{fill:'#6E6E6E',fontSize:11}} axisLine={false} tickLine={false}
-                label={{value:'Conversion Rate',angle:-90,position:'insideLeft',fontSize:11,fill:'#6E6E6E'}}/>
-              <Tooltip content={<CustomScatterTooltip xKey="traffic" xLabel="Traffic" xFmt={fmtK}/>} cursor={{strokeDasharray:'3 3'}}/>
-              <Scatter data={convBarData}>
-                {convBarData.map(d=><Cell key={d.brand} fill={d.color}/>)}
-                <LabelList dataKey="brand" position="top" style={{fontSize:11,fontWeight:600,fill:'var(--c-brown)'}}/>
-              </Scatter>
-            </ScatterChart>
-          </ResponsiveContainer>
+          <div style={{position:'relative'}}>
+            <ResponsiveContainer width="100%" height={320}>
+              <ScatterChart margin={{left:20,right:30,top:20,bottom:20}}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#EAEAEA"/>
+                <XAxis type="number" dataKey="traffic" name="Total Traffic" tickFormatter={fmtK} tick={{fill:'#6E6E6E',fontSize:11}} axisLine={false} tickLine={false}
+                  label={{value:'Total Traffic',position:'insideBottom',offset:-8,fontSize:11,fill:'#6E6E6E'}}/>
+                <YAxis type="number" dataKey="conv" name="Conversion Rate" tickFormatter={v=>v+'%'} tick={{fill:'#6E6E6E',fontSize:11}} axisLine={false} tickLine={false}
+                  label={{value:'Conversion Rate',angle:-90,position:'insideLeft',fontSize:11,fill:'#6E6E6E'}}/>
+                <Tooltip content={<CustomScatterTooltip xKey="traffic" xLabel="Traffic" xFmt={fmtK}/>} cursor={{strokeDasharray:'3 3'}}/>
+                <Scatter data={convBarData}>
+                  {convBarData.map(d=><Cell key={d.brand} fill={d.color}/>)}
+                  <LabelList dataKey="brand" position="top" style={{fontSize:11,fontWeight:600,fill:'var(--c-brown)'}}/>
+                </Scatter>
+              </ScatterChart>
+            </ResponsiveContainer>
+            {insights && <CorrBadge r={insights.corrTrafficConv}/>}
+          </div>
           <BarLegend data={convBarData}/>
         </div>
       </div>
@@ -814,24 +826,27 @@ function Dashboard(){
             </div>
             {insights && (
               <div className="chart-header-insight" style={{flex:1,marginLeft:20}}>
-                {insights.sigRevConv?(()=>{const c=corrDesc(insights.corrRevConv); return <>매출과 전환율 간에는 <span className="hl">{c.strength} {c.dir}의 상관관계</span>(r=<span className="hl">{insights.corrRevConv.toFixed(2)}</span>)가 있어, {c.dir==='양'?'매출이 높은 브랜드일수록 전환율도 높은 경향이 있습니다':'매출이 높다고 전환 효율까지 높은 것은 아닙니다'}.</>;})():<>매출과 전환율 간에 뚜렷한 상관관계는 보이지 않아, 매출 규모만으로는 전환 효율을 설명하기 어렵습니다.</>}
+                {insights.sigRevConv?(()=>{const c=corrDesc(insights.corrRevConv); return <>매출과 전환율 간에는 <span className="hl">{c.strength} {c.dir}의 상관관계</span>(상관계수 <span className="hl">{insights.corrRevConv.toFixed(2)}</span>)가 있어, {c.dir==='양'?'매출이 높은 브랜드일수록 전환율도 높은 경향이 있습니다':'매출이 높다고 전환 효율까지 높은 것은 아닙니다'}.</>;})():<>매출과 전환율 간에 뚜렷한 상관관계는 보이지 않아, 매출 규모만으로는 전환 효율을 설명하기 어렵습니다.</>}
               </div>
             )}
           </div>
-          <ResponsiveContainer width="100%" height={320}>
-            <ScatterChart margin={{left:20,right:30,top:20,bottom:20}}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#EAEAEA"/>
-              <XAxis type="number" dataKey="rev" name="Revenue" tickFormatter={fmtM} tick={{fill:'#6E6E6E',fontSize:11}} axisLine={false} tickLine={false}
-                label={{value:'Revenue',position:'insideBottom',offset:-8,fontSize:11,fill:'#6E6E6E'}}/>
-              <YAxis type="number" dataKey="conv" name="Conversion Rate" tickFormatter={v=>v+'%'} tick={{fill:'#6E6E6E',fontSize:11}} axisLine={false} tickLine={false}
-                label={{value:'Conversion Rate',angle:-90,position:'insideLeft',fontSize:11,fill:'#6E6E6E'}}/>
-              <Tooltip content={<CustomScatterTooltip xKey="rev" xLabel="Revenue" xFmt={fmtM}/>} cursor={{strokeDasharray:'3 3'}}/>
-              <Scatter data={revConvData}>
-                {revConvData.map(d=><Cell key={d.brand} fill={d.color}/>)}
-                <LabelList dataKey="brand" position="top" style={{fontSize:11,fontWeight:600,fill:'var(--c-brown)'}}/>
-              </Scatter>
-            </ScatterChart>
-          </ResponsiveContainer>
+          <div style={{position:'relative'}}>
+            <ResponsiveContainer width="100%" height={320}>
+              <ScatterChart margin={{left:20,right:30,top:20,bottom:20}}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#EAEAEA"/>
+                <XAxis type="number" dataKey="rev" name="Revenue" tickFormatter={fmtM} tick={{fill:'#6E6E6E',fontSize:11}} axisLine={false} tickLine={false}
+                  label={{value:'Revenue',position:'insideBottom',offset:-8,fontSize:11,fill:'#6E6E6E'}}/>
+                <YAxis type="number" dataKey="conv" name="Conversion Rate" tickFormatter={v=>v+'%'} tick={{fill:'#6E6E6E',fontSize:11}} axisLine={false} tickLine={false}
+                  label={{value:'Conversion Rate',angle:-90,position:'insideLeft',fontSize:11,fill:'#6E6E6E'}}/>
+                <Tooltip content={<CustomScatterTooltip xKey="rev" xLabel="Revenue" xFmt={fmtM}/>} cursor={{strokeDasharray:'3 3'}}/>
+                <Scatter data={revConvData}>
+                  {revConvData.map(d=><Cell key={d.brand} fill={d.color}/>)}
+                  <LabelList dataKey="brand" position="top" style={{fontSize:11,fontWeight:600,fill:'var(--c-brown)'}}/>
+                </Scatter>
+              </ScatterChart>
+            </ResponsiveContainer>
+            {insights && <CorrBadge r={insights.corrRevConv}/>}
+          </div>
           <BarLegend data={revConvData}/>
         </div>
       </div>
@@ -845,24 +860,27 @@ function Dashboard(){
             </div>
             {insights && (
               <div className="chart-header-insight" style={{flex:1,marginLeft:20}}>
-                {insights.sigRevTraffic?(()=>{const c=corrDesc(insights.corrRevTraffic); return <>트래픽과 매출 간에는 <span className="hl">{c.strength} {c.dir}의 상관관계</span>(r=<span className="hl">{insights.corrRevTraffic.toFixed(2)}</span>, p&lt;0.05)가 있어, {c.dir==='양'?'트래픽이 많은 브랜드일수록 매출도 높은 경향이 있습니다':'트래픽 규모와 매출이 반대로 움직이는 경향이 있습니다'}.</>;})():<>트래픽과 매출 간에 뚜렷한 상관관계는 보이지 않습니다.</>}
+                {insights.sigRevTraffic?(()=>{const c=corrDesc(insights.corrRevTraffic); return <>트래픽과 매출 간에는 <span className="hl">{c.strength} {c.dir}의 상관관계</span>(상관계수 <span className="hl">{insights.corrRevTraffic.toFixed(2)}</span>, p&lt;0.05)가 있어, {c.dir==='양'?'트래픽이 많은 브랜드일수록 매출도 높은 경향이 있습니다':'트래픽 규모와 매출이 반대로 움직이는 경향이 있습니다'}.</>;})():<>트래픽과 매출 간에 뚜렷한 상관관계는 보이지 않습니다.</>}
               </div>
             )}
           </div>
-          <ResponsiveContainer width="100%" height={320}>
-            <ScatterChart margin={{left:20,right:30,top:20,bottom:20}}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#EAEAEA"/>
-              <XAxis type="number" dataKey="traffic" name="Total Traffic" tickFormatter={fmtK} tick={{fill:'#6E6E6E',fontSize:11}} axisLine={false} tickLine={false}
-                label={{value:'Total Traffic',position:'insideBottom',offset:-8,fontSize:11,fill:'#6E6E6E'}}/>
-              <YAxis type="number" dataKey="rev" name="Revenue" tickFormatter={fmtM} tick={{fill:'#6E6E6E',fontSize:11}} axisLine={false} tickLine={false}
-                label={{value:'Revenue',angle:-90,position:'insideLeft',fontSize:11,fill:'#6E6E6E'}}/>
-              <Tooltip content={<CustomScatterTooltip xKey="traffic" xLabel="Traffic" xFmt={fmtK} yKey="rev" yLabel="Revenue" yFmt={fmtM}/>} cursor={{strokeDasharray:'3 3'}}/>
-              <Scatter data={trafficRevData}>
-                {trafficRevData.map(d=><Cell key={d.brand} fill={d.color}/>)}
-                <LabelList dataKey="brand" position="top" style={{fontSize:11,fontWeight:600,fill:'var(--c-brown)'}}/>
-              </Scatter>
-            </ScatterChart>
-          </ResponsiveContainer>
+          <div style={{position:'relative'}}>
+            <ResponsiveContainer width="100%" height={320}>
+              <ScatterChart margin={{left:20,right:30,top:20,bottom:20}}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#EAEAEA"/>
+                <XAxis type="number" dataKey="traffic" name="Total Traffic" tickFormatter={fmtK} tick={{fill:'#6E6E6E',fontSize:11}} axisLine={false} tickLine={false}
+                  label={{value:'Total Traffic',position:'insideBottom',offset:-8,fontSize:11,fill:'#6E6E6E'}}/>
+                <YAxis type="number" dataKey="rev" name="Revenue" tickFormatter={fmtM} tick={{fill:'#6E6E6E',fontSize:11}} axisLine={false} tickLine={false}
+                  label={{value:'Revenue',angle:-90,position:'insideLeft',fontSize:11,fill:'#6E6E6E'}}/>
+                <Tooltip content={<CustomScatterTooltip xKey="traffic" xLabel="Traffic" xFmt={fmtK} yKey="rev" yLabel="Revenue" yFmt={fmtM}/>} cursor={{strokeDasharray:'3 3'}}/>
+                <Scatter data={trafficRevData}>
+                  {trafficRevData.map(d=><Cell key={d.brand} fill={d.color}/>)}
+                  <LabelList dataKey="brand" position="top" style={{fontSize:11,fontWeight:600,fill:'var(--c-brown)'}}/>
+                </Scatter>
+              </ScatterChart>
+            </ResponsiveContainer>
+            {insights && <CorrBadge r={insights.corrRevTraffic}/>}
+          </div>
           <BarLegend data={trafficRevData}/>
         </div>
       </div>
