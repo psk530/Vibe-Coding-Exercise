@@ -18,19 +18,25 @@ import os
 import sqlite3
 from pathlib import Path
 
-import anthropic
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from openai import OpenAI
 from pydantic import BaseModel
 
 ROOT = Path(__file__).resolve().parent.parent
 DB_PATH = ROOT / "db" / "dashboard.db"
 
 app = FastAPI(title="Brand Dashboard API")
-anthropic_client = anthropic.Anthropic()
 
-CHAT_MODEL = "claude-sonnet-5"
+CHAT_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o")
+
+
+def get_openai_client() -> OpenAI:
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        raise HTTPException(500, "OPENAI_API_KEY가 서버에 설정되어 있지 않습니다.")
+    return OpenAI(api_key=api_key)
 
 CHAT_SYSTEM_TEMPLATE = """당신은 'US TV Market — Brand Competition Dashboard'의 데이터 분석 어시스턴트입니다.
 아래는 2024~2026년 Amazon.com TV 카테고리의 주차별 브랜드 판매 데이터(CSV)입니다.
@@ -115,31 +121,27 @@ def totals():
 
 @app.post("/api/chat")
 def chat(req: ChatRequest):
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        raise HTTPException(500, "ANTHROPIC_API_KEY가 서버에 설정되어 있지 않습니다.")
+    openai_client = get_openai_client()
 
     system = CHAT_SYSTEM_TEMPLATE.format(data_csv=build_data_csv())
-    messages = [{"role": m.role, "content": m.content} for m in req.history]
-    messages.append({"role": "user", "content": req.message})
+    input_messages = [{"role": m.role, "content": m.content} for m in req.history]
+    input_messages.append({"role": "user", "content": req.message})
 
     try:
-        resp = anthropic_client.messages.create(
+        resp = openai_client.responses.create(
             model=CHAT_MODEL,
-            max_tokens=1024,
-            system=system,
-            tools=[{"type": "web_search_20250305", "name": "web_search", "max_uses": 5}],
-            messages=messages,
+            instructions=system,
+            input=input_messages,
+            tools=[{"type": "web_search_preview"}],
         )
     except Exception:
-        resp = anthropic_client.messages.create(
+        resp = openai_client.responses.create(
             model=CHAT_MODEL,
-            max_tokens=1024,
-            system=system,
-            messages=messages,
+            instructions=system,
+            input=input_messages,
         )
 
-    text = "".join(block.text for block in resp.content if block.type == "text")
-    return {"reply": text or "답변을 생성하지 못했습니다."}
+    return {"reply": resp.output_text or "답변을 생성하지 못했습니다."}
 
 
 @app.get("/")

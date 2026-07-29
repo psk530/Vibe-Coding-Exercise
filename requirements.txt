@@ -2,4 +2,4 @@ fastapi
 uvicorn
 pandas
 openpyxl
-anthropic
+openai
