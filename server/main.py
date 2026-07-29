@@ -29,14 +29,14 @@ DB_PATH = ROOT / "db" / "dashboard.db"
 
 app = FastAPI(title="Brand Dashboard API")
 
-CHAT_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o")
+CHAT_MODEL = os.environ.get("OPENROUTER_MODEL", "openai/gpt-4o")
 
 
-def get_openai_client() -> OpenAI:
-    api_key = os.environ.get("OPENAI_API_KEY")
+def get_openrouter_client() -> OpenAI:
+    api_key = os.environ.get("OPENROUTER_API_KEY")
     if not api_key:
-        raise HTTPException(500, "OPENAI_API_KEY가 서버에 설정되어 있지 않습니다.")
-    return OpenAI(api_key=api_key)
+        raise HTTPException(500, "OPENROUTER_API_KEY가 서버에 설정되어 있지 않습니다.")
+    return OpenAI(base_url="https://openrouter.ai/api/v1", api_key=api_key)
 
 CHAT_SYSTEM_TEMPLATE = """당신은 'US TV Market — Brand Competition Dashboard'의 데이터 분석 어시스턴트입니다.
 아래는 2024~2026년 Amazon.com TV 카테고리의 주차별 브랜드 판매 데이터(CSV)입니다.
@@ -46,7 +46,7 @@ week 컬럼은 YYYYWW 형식입니다 (예: 202520 = 2025년 20주차). conv(전
 답변 규칙:
 1. 매출/트래픽/판매량/전환율 등 데이터에서 직접 확인 가능한 수치는 CSV를 근거로 정확히 계산해서 답하세요.
 2. "왜 ~했는지", "원인이 뭐야" 같은 질문에는 먼저 CSV 데이터 안에서 근거(전후 주차 대비 변화, 다른 브랜드와의 비교, 계절성 등)를 찾아 분석하고,
-   필요하면 web_search 도구로 관련 뉴스/기사(신제품 출시, 프로모션, 이벤트, 시즌 세일 등)를 검색해 근거를 보강하세요.
+   검색으로 얻은 최신 뉴스/기사(신제품 출시, 프로모션, 이벤트, 시즌 세일 등)가 있다면 근거로 함께 활용하세요.
 3. 답변은 간결한 한국어로 작성하고, 확실한 사실과 추정을 구분해서 표현하세요 (예: "~로 추정됩니다").
 
 데이터(CSV):
@@ -121,30 +121,29 @@ def totals():
 
 @app.post("/api/chat")
 def chat(req: ChatRequest):
-    openai_client = get_openai_client()
+    client = get_openrouter_client()
 
     system = CHAT_SYSTEM_TEMPLATE.format(data_csv=build_data_csv())
-    input_messages = [{"role": m.role, "content": m.content} for m in req.history]
-    input_messages.append({"role": "user", "content": req.message})
+    messages = [{"role": "system", "content": system}]
+    messages += [{"role": m.role, "content": m.content} for m in req.history]
+    messages.append({"role": "user", "content": req.message})
 
     try:
-        resp = openai_client.responses.create(
-            model=CHAT_MODEL,
-            instructions=system,
-            input=input_messages,
-            tools=[{"type": "web_search_preview"}],
+        resp = client.chat.completions.create(
+            model=f"{CHAT_MODEL}:online",
+            messages=messages,
         )
     except Exception as e1:
         try:
-            resp = openai_client.responses.create(
+            resp = client.chat.completions.create(
                 model=CHAT_MODEL,
-                instructions=system,
-                input=input_messages,
+                messages=messages,
             )
         except Exception as e2:
-            raise HTTPException(500, f"tools_call_error={e1!r}; no_tools_call_error={e2!r}")
+            raise HTTPException(500, f"online_call_error={e1!r}; base_call_error={e2!r}")
 
-    return {"reply": resp.output_text or "답변을 생성하지 못했습니다."}
+    reply = resp.choices[0].message.content
+    return {"reply": reply or "답변을 생성하지 못했습니다."}
 
 
 @app.get("/")
