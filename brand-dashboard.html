@@ -23,7 +23,25 @@
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
 html,body{height:100%}
 body{background:var(--c-cream);color:var(--c-brown);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:14px;line-height:1.5}
-#root{min-height:100vh;padding:24px 28px;max-width:1440px;margin:0 auto}
+#root{height:100vh}
+.app-shell{display:flex;height:100vh;width:100%}
+.dashboard-col{flex:1;overflow-y:auto;padding:24px 28px;max-width:1440px;margin:0 auto;min-width:0}
+.resize-handle{width:6px;flex-shrink:0;cursor:col-resize;background:var(--c-khaki);transition:background .15s}
+.resize-handle:hover{background:var(--c-red)}
+.chat-col{display:flex;flex-direction:column;height:100vh;flex-shrink:0;background:#fff;border-left:1px solid var(--c-gray-light)}
+.chat-header{padding:16px 18px;border-bottom:1px solid var(--c-gray-light);font-size:14px;font-weight:700;color:var(--c-brown);flex-shrink:0}
+.chat-empty-hint{font-size:12px;color:var(--c-gray-dark);padding:14px 18px;line-height:1.6;border-bottom:1px solid var(--c-gray-light)}
+.chat-messages{flex:1;overflow-y:auto;padding:16px 18px;display:flex;flex-direction:column;gap:10px}
+.chat-msg{max-width:92%;padding:9px 12px;border-radius:10px;font-size:13px;line-height:1.55;white-space:pre-wrap}
+.chat-msg.user{align-self:flex-end;background:var(--c-red);color:#fff;border-bottom-right-radius:2px}
+.chat-msg.bot{align-self:flex-start;background:var(--c-pink);color:var(--c-brown);border-bottom-left-radius:2px}
+.chat-msg.error{align-self:flex-start;background:#fde8e8;color:var(--c-red);border-bottom-left-radius:2px}
+.chat-msg.pending{align-self:flex-start;background:var(--c-pink);color:var(--c-gray-dark);font-style:italic}
+.chat-input-row{display:flex;gap:8px;padding:14px 16px;border-top:1px solid var(--c-gray-light);flex-shrink:0}
+.chat-input{flex:1;border:1px solid var(--c-gray-light);border-radius:8px;padding:8px 12px;font-size:13px;resize:none;outline:none;font-family:inherit}
+.chat-input:focus{border-color:var(--c-red)}
+.chat-send-btn{background:var(--c-red);color:#fff;border:none;border-radius:8px;padding:0 16px;font-size:13px;font-weight:600;cursor:pointer;flex-shrink:0}
+.chat-send-btn:disabled{opacity:.5;cursor:default}
 .header{margin-bottom:18px;padding-bottom:16px;border-bottom:1px solid var(--c-khaki);display:flex;align-items:center;gap:12px}
 .header-badge{width:34px;height:34px;border-radius:9px;background:var(--c-red);color:#fff;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;letter-spacing:-0.5px}
 .header h1{font-size:19px;font-weight:700;color:var(--c-brown)}
@@ -76,7 +94,7 @@ const DASHES=['0','6 3','2 3','9 3 2 3','1 3','6 3 2 3','2 5','9 3','4 2','1 5']
 
 </script>
 <script type="text/babel">
-const {useState,useMemo,useEffect}=React;
+const {useState,useMemo,useEffect,useRef}=React;
 const {LineChart,Line,BarChart,Bar,PieChart,Pie,Cell,XAxis,YAxis,CartesianGrid,Tooltip,Legend,ResponsiveContainer,LabelList,ReferenceDot,ScatterChart,Scatter,ZAxis}=Recharts;
 
 const fmtM=n=>`$${(n/1e6).toFixed(1)}M`;
@@ -220,6 +238,73 @@ function CorrBadge({r}){
   );
 }
 
+function ChatPanel(){
+  const [messages,setMessages]=useState([]);
+  const [input,setInput]=useState('');
+  const [sending,setSending]=useState(false);
+  const bottomRef=useRef(null);
+
+  useEffect(()=>{
+    bottomRef.current?.scrollIntoView({behavior:'smooth'});
+  },[messages,sending]);
+
+  const send=()=>{
+    const text=input.trim();
+    if(!text||sending) return;
+    const history=messages.slice(-10).map(m=>({role:m.role,content:m.content}));
+    setMessages(prev=>[...prev,{role:'user',content:text}]);
+    setInput('');
+    setSending(true);
+    fetch('/api/chat',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({message:text,history}),
+    }).then(r=>{
+      if(!r.ok) throw new Error('서버 오류 ('+r.status+')');
+      return r.json();
+    }).then(data=>{
+      setMessages(prev=>[...prev,{role:'assistant',content:data.reply}]);
+    }).catch(e=>{
+      setMessages(prev=>[...prev,{role:'assistant',content:'답변을 가져오지 못했습니다: '+e.message,error:true}]);
+    }).finally(()=>setSending(false));
+  };
+
+  const onKeyDown=e=>{
+    if(e.key==='Enter'&&!e.shiftKey){
+      e.preventDefault();
+      send();
+    }
+  };
+
+  return (
+    <>
+      <div className="chat-header">대시보드 Q&amp;A</div>
+      {messages.length===0 && (
+        <div className="chat-empty-hint">
+          왼쪽 대시보드 데이터에 대해 질문해 보세요.<br/>
+          예시:<br/>
+          · "25년 20주차 삼성 매출과 트래픽 알려줘"<br/>
+          · "25년 10주차 삼성 트래픽이 갑자기 오른 이유가 뭐야?"
+        </div>
+      )}
+      <div className="chat-messages">
+        {messages.map((m,i)=>(
+          <div key={i} className={"chat-msg "+(m.role==='user'?'user':m.error?'error':'bot')}>{m.content}</div>
+        ))}
+        {sending && <div className="chat-msg pending">답변 생성 중...</div>}
+        <div ref={bottomRef}/>
+      </div>
+      <div className="chat-input-row">
+        <textarea className="chat-input" rows={2} value={input}
+          onChange={e=>setInput(e.target.value)}
+          onKeyDown={onKeyDown}
+          placeholder="질문을 입력하세요..."/>
+        <button className="chat-send-btn" onClick={send} disabled={sending||!input.trim()}>전송</button>
+      </div>
+    </>
+  );
+}
+
 function Dashboard(){
   const [sel,setSel]=useState(new Set(BRANDS));
   const [period,setPeriod]=useState('all');
@@ -227,6 +312,32 @@ function Dashboard(){
   const [weekly,setWeekly]=useState(null);
   const [totals,setTotals]=useState(null);
   const [loadError,setLoadError]=useState(null);
+  const [chatWidth,setChatWidth]=useState(360);
+  const draggingRef=useRef(false);
+
+  useEffect(()=>{
+    const onMove=e=>{
+      if(!draggingRef.current) return;
+      const w=window.innerWidth-e.clientX;
+      setChatWidth(Math.min(600,Math.max(280,w)));
+    };
+    const onUp=()=>{
+      draggingRef.current=false;
+      document.body.style.cursor='';
+    };
+    window.addEventListener('mousemove',onMove);
+    window.addEventListener('mouseup',onUp);
+    return ()=>{
+      window.removeEventListener('mousemove',onMove);
+      window.removeEventListener('mouseup',onUp);
+    };
+  },[]);
+
+  const onHandleMouseDown=e=>{
+    e.preventDefault();
+    draggingRef.current=true;
+    document.body.style.cursor='col-resize';
+  };
 
   useEffect(()=>{
     Promise.all([
@@ -426,7 +537,8 @@ function Dashboard(){
   }
 
   return (
-    <div>
+    <div className="app-shell">
+    <div className="dashboard-col">
       <div className="header">
         <div className="header-badge">TV</div>
         <div>
@@ -878,6 +990,11 @@ function Dashboard(){
           <BarLegend data={trafficRevData}/>
         </div>
       </div>
+    </div>
+    <div className="resize-handle" onMouseDown={onHandleMouseDown}/>
+    <div className="chat-col" style={{width:chatWidth}}>
+      <ChatPanel/>
+    </div>
     </div>
   );
 }
