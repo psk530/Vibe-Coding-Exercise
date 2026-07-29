@@ -15,6 +15,7 @@ Run with:
 then open http://localhost:8000/
 """
 import os
+import re
 import sqlite3
 from pathlib import Path
 
@@ -65,6 +66,17 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     message: str
     history: list[ChatMessage] = []
+
+
+def strip_markdown(text: str) -> str:
+    text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
+    text = re.sub(r'__(.+?)__', r'\1', text)
+    text = re.sub(r'(?<!\*)\*([^\*\n]+?)\*(?!\*)', r'\1', text)
+    text = re.sub(r'`([^`]+)`', r'\1', text)
+    text = re.sub(r'^\s{0,3}#{1,6}\s*', '', text, flags=re.MULTILINE)
+    text = re.sub(r'^\s{0,3}>\s?', '', text, flags=re.MULTILINE)
+    text = re.sub(r'^\s{0,3}[-*+]\s+', '', text, flags=re.MULTILINE)
+    return text
 
 
 def build_data_csv() -> str:
@@ -147,7 +159,7 @@ def chat(req: ChatRequest):
             raise HTTPException(500, "AI 응답 생성 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.")
 
     reply = resp.choices[0].message.content
-    return {"reply": reply or "답변을 생성하지 못했습니다."}
+    return {"reply": strip_markdown(reply) if reply else "답변을 생성하지 못했습니다."}
 
 
 @app.get("/")
