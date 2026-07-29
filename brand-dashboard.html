@@ -225,10 +225,10 @@ function CustomTooltip({active,payload,label,metric}){
 function BarLegend({data}){
   return (
     <div style={{display:'flex',flexWrap:'wrap',gap:'4px 12px',marginTop:10,paddingTop:10,borderTop:'1px solid var(--c-gray-light)'}}>
-      {data.map(d=>(
-        <div key={d.brand} style={{display:'flex',alignItems:'center',gap:5}}>
-          <div style={{width:8,height:8,borderRadius:'50%',background:d.color,flexShrink:0}}/>
-          <span style={{fontSize:11,color:'var(--c-gray-dark)'}}>{d.brand}</span>
+      {data.map((d,i)=>(
+        <div key={d.brand||d.name||i} style={{display:'flex',alignItems:'center',gap:5}}>
+          <div style={{width:8,height:8,borderRadius:'50%',background:d.color||d.fill,flexShrink:0}}/>
+          <span style={{fontSize:11,color:'var(--c-gray-dark)'}}>{d.brand||d.name}</span>
         </div>
       ))}
     </div>
@@ -555,6 +555,7 @@ function Dashboard(){
   },[filteredTotals,metric]);
 
   const trendData=useMemo(()=>weekly?buildTrendData(weekly,[...sel],period):[],[weekly,sel,period]);
+  const selLegendData=useMemo(()=>[...sel].map(b=>({brand:b,color:COLORS[BRANDS.indexOf(b)]})),[sel]);
 
   const trendPeak=useMemo(()=>{
     if(!trendData.length) return null;
@@ -902,9 +903,9 @@ function Dashboard(){
                 {pieData.map((d,i)=><Cell key={d.name} fill={d.fill}/>)}
               </Pie>
               <Tooltip content={<CustomPieTooltip/>}/>
-              <Legend iconType="circle" iconSize={9} formatter={(v)=><span style={{fontSize:12,color:'#47422E'}}>{v}</span>}/>
             </PieChart>
           </ResponsiveContainer>
+          <BarLegend data={pieData}/>
         </div>
 
         <div className="chart-card">
@@ -954,7 +955,6 @@ function Dashboard(){
               <XAxis dataKey="label" tick={{fill:'#6E6E6E',fontSize:11}} axisLine={false} tickLine={false} interval="preserveStartEnd"/>
               <YAxis tickFormatter={v=>metric==='rev'?fmtM(v):fmtK(v)} tick={{fill:'#6E6E6E',fontSize:11}} axisLine={false} tickLine={false}/>
               <Tooltip content={<CustomTooltip metric={metric}/>}/>
-              <Legend iconType="circle" iconSize={8} formatter={v=><span style={{fontSize:12,color:'#47422E'}}>{v}</span>}/>
               {[...sel].map(b=>(
                 <Line key={b} type="monotone"
                   dataKey={metric==='rev'?b:b+'_u'}
@@ -970,6 +970,7 @@ function Dashboard(){
               )}
             </LineChart>
           </ResponsiveContainer>
+          <BarLegend data={selLegendData}/>
         </div>
       </div>
 
@@ -998,7 +999,6 @@ function Dashboard(){
               <XAxis dataKey="label" tick={{fill:'#6E6E6E',fontSize:11}} axisLine={false} tickLine={false} interval="preserveStartEnd"/>
               <YAxis tickFormatter={fmtK} tick={{fill:'#6E6E6E',fontSize:11}} axisLine={false} tickLine={false}/>
               <Tooltip content={<CustomTooltip metric="traffic"/>}/>
-              <Legend iconType="circle" iconSize={8} formatter={v=><span style={{fontSize:12,color:'#47422E'}}>{v}</span>}/>
               {[...sel].map(b=>(
                 <Line key={b} type="monotone"
                   dataKey={b+trafficSuffix}
@@ -1014,6 +1014,7 @@ function Dashboard(){
               )}
             </LineChart>
           </ResponsiveContainer>
+          <BarLegend data={selLegendData}/>
         </div>
       </div>
 
@@ -1201,9 +1202,9 @@ function Dashboard(){
                 {osPieData.map((d,i)=><Cell key={d.name} fill={d.fill}/>)}
               </Pie>
               <Tooltip content={<CustomOsPieTooltip/>}/>
-              <Legend iconType="circle" iconSize={9} formatter={(v)=><span style={{fontSize:12,color:'#47422E'}}>{v}</span>}/>
             </PieChart>
           </ResponsiveContainer>
+          <BarLegend data={osPieData}/>
         </div>
       </div>
 
