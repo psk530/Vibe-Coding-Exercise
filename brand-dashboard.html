@@ -1222,7 +1222,10 @@ function Dashboard(){
                   {MODEL_TABLE_COLUMNS.map(col=>(
                     <th key={col.key}
                         onClick={col.sortable?()=>setModelSort(col.key):undefined}
-                        style={{textAlign:col.align,padding:'8px 10px',borderBottom:'2px solid var(--c-khaki)',color:col.sortable&&modelSort===col.key?'var(--c-red)':'var(--c-gray-dark)',whiteSpace:'nowrap',cursor:col.sortable?'pointer':'default',userSelect:'none',fontWeight:600}}>
+                        style={{textAlign:col.align,padding:'8px 10px',borderBottom:'2px solid var(--c-khaki)',
+                          color:col.sortable?(modelSort===col.key?'var(--c-red)':'#1a56db'):'var(--c-gray-dark)',
+                          textDecoration:col.sortable?'underline':'none',textUnderlineOffset:'3px',
+                          whiteSpace:'nowrap',cursor:col.sortable?'pointer':'default',userSelect:'none',fontWeight:600}}>
                       {col.label}{col.sortable&&modelSort===col.key?' ▼':''}
                     </th>
                   ))}
