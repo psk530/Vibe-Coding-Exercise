@@ -53,7 +53,8 @@ week 컬럼은 YYYYWW 형식입니다 (예: 202520 = 2025년 20주차). conv(전
     {{"type": "table", "title": "표 제목(선택, 없으면 빈 문자열)", "headers": ["열1", "열2"], "rows": [["값1", "값2"]]}},
     {{"type": "chart", "chartType": "bar 또는 line", "title": "차트 제목(선택)", "xKey": "label", "series": [{{"key": "value", "name": "계열 이름"}}], "data": [{{"label": "202519", "value": 12345}}]}}
   ],
-  "suggestions": ["팔로우업 질문1", "팔로우업 질문2", "팔로우업 질문3"]
+  "suggestions": ["팔로우업 질문1", "팔로우업 질문2", "팔로우업 질문3"],
+  "sources": ["대시보드"]
 }}
 
 블록 작성 규칙:
@@ -72,6 +73,9 @@ week 컬럼은 YYYYWW 형식입니다 (예: 202520 = 2025년 20주차). conv(전
    그 외 #, 별표 하나(*), -, |, `, > 같은 마크다운 기호나 이모지는 절대 쓰지 마세요.
 7. suggestions에는 이번 답변과 지금까지의 대화 맥락을 고려했을 때 사용자가 다음으로 물어보면 유용할 구체적인 질문 3개를 만드세요.
    데이터로 답할 수 있거나 추가 분석이 가능한, 실용적인 질문으로 작성하고, 이미 방금 답한 내용을 그대로 반복하는 질문은 피하세요.
+8. sources에는 이 답변의 근거를 정확히 밝히세요. CSV 데이터만으로 답했다면 ["대시보드"] 하나만 넣으세요.
+   웹 검색 결과를 근거로 사용했다면 실제로 참고한 기사/페이지의 URL을 추가하세요 (예: ["대시보드", "https://example.com/article"]).
+   데이터 없이 검색 결과만으로 답했다면 대시보드 없이 URL만 넣으세요. 실제로 사용하지 않은 근거는 절대 넣지 마세요.
 
 데이터(CSV):
 {data_csv}
@@ -109,11 +113,14 @@ DEFAULT_SUGGESTIONS = [
 ]
 
 
+DEFAULT_SOURCES = ["대시보드"]
+
+
 def parse_chat_response(raw: str):
     try:
         obj = json.loads(raw)
     except Exception:
-        return [{"type": "text", "content": strip_markdown(raw or "")}], DEFAULT_SUGGESTIONS
+        return [{"type": "text", "content": strip_markdown(raw or "")}], DEFAULT_SUGGESTIONS, DEFAULT_SOURCES
 
     blocks = obj.get("blocks")
     if not isinstance(blocks, list):
@@ -158,7 +165,13 @@ def parse_chat_response(raw: str):
             suggestions.append(strip_markdown(s.strip()))
     suggestions = suggestions[:3] or DEFAULT_SUGGESTIONS
 
-    return cleaned, suggestions
+    sources = []
+    for s in (obj.get("sources") or []):
+        if isinstance(s, str) and s.strip():
+            sources.append(s.strip())
+    sources = sources[:5] or DEFAULT_SOURCES
+
+    return cleaned, suggestions, sources
 
 
 def build_data_csv() -> str:
@@ -335,8 +348,8 @@ def chat(req: ChatRequest):
         raise HTTPException(500, "AI 응답 생성 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.")
 
     raw = resp.choices[0].message.content
-    blocks, suggestions = parse_chat_response(raw)
-    return {"blocks": blocks, "suggestions": suggestions}
+    blocks, suggestions, sources = parse_chat_response(raw)
+    return {"blocks": blocks, "suggestions": suggestions, "sources": sources}
 
 
 @app.get("/")

@@ -297,6 +297,22 @@ function renderHighlighted(text){
   });
 }
 
+function SourceLine({sources}){
+  if(!sources||!sources.length) return null;
+  return (
+    <div style={{marginTop:8,paddingTop:6,borderTop:'1px dashed var(--c-gray-light)',fontSize:11,color:'var(--c-gray-dark)'}}>
+      출처 : {sources.map((s,i)=>(
+        <React.Fragment key={i}>
+          {i>0 && ', '}
+          {/^https?:\/\//.test(s)?(
+            <a href={s} target="_blank" rel="noopener noreferrer" style={{color:'#1a56db',textDecoration:'underline'}}>{s}</a>
+          ):s}
+        </React.Fragment>
+      ))}
+    </div>
+  );
+}
+
 function flattenBlocks(blocks){
   return blocks.map(b=>{
     if(b.type==='table'){
@@ -401,7 +417,8 @@ function ChatPanel(){
       return r.json();
     }).then(data=>{
       const blocks=Array.isArray(data.blocks)&&data.blocks.length?data.blocks:[{type:'text',content:'답변을 생성하지 못했습니다.'}];
-      setMessages(prev=>[...prev,{role:'assistant',content:flattenBlocks(blocks),blocks}]);
+      const sources=Array.isArray(data.sources)&&data.sources.length?data.sources:['대시보드'];
+      setMessages(prev=>[...prev,{role:'assistant',content:flattenBlocks(blocks),blocks,sources}]);
       if(Array.isArray(data.suggestions)&&data.suggestions.length) setSuggestions(data.suggestions);
     }).catch(e=>{
       setMessages(prev=>[...prev,{role:'assistant',content:'답변을 가져오지 못했습니다: '+e.message,error:true}]);
@@ -432,6 +449,7 @@ function ChatPanel(){
         {messages.map((m,i)=>(
           <div key={i} className={"chat-msg "+(m.role==='user'?'user':m.error?'error':'bot')}>
             {m.role==='assistant'&&m.blocks?<ChatBlocks blocks={m.blocks}/>:m.content}
+            {m.role==='assistant'&&!m.error&&<SourceLine sources={m.sources}/>}
           </div>
         ))}
         {sending && <div className="chat-msg pending">{CHAT_STAGES[stageIdx]}</div>}
