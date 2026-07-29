@@ -49,12 +49,11 @@ week 컬럼은 YYYYWW 형식입니다 (예: 202520 = 2025년 20주차). conv(전
 
 {{
   "blocks": [
-    {{"type": "text", "content": "설명 문장"}},
-    {{"type": "table", "title": "표 제목(선택, 없으면 빈 문자열)", "headers": ["열1", "열2"], "rows": [["값1", "값2"]]}},
-    {{"type": "chart", "chartType": "bar 또는 line", "title": "차트 제목(선택)", "xKey": "label", "series": [{{"key": "value", "name": "계열 이름"}}], "data": [{{"label": "202519", "value": 12345}}]}}
+    {{"type": "text", "content": "설명 문장", "source": null}},
+    {{"type": "table", "title": "표 제목(선택, 없으면 빈 문자열)", "headers": ["열1", "열2"], "rows": [["값1", "값2"]], "source": null}},
+    {{"type": "chart", "chartType": "bar 또는 line", "title": "차트 제목(선택)", "xKey": "label", "series": [{{"key": "value", "name": "계열 이름"}}], "data": [{{"label": "202519", "value": 12345}}], "source": null}}
   ],
-  "suggestions": ["팔로우업 질문1", "팔로우업 질문2", "팔로우업 질문3"],
-  "sources": ["대시보드"]
+  "suggestions": ["팔로우업 질문1", "팔로우업 질문2", "팔로우업 질문3"]
 }}
 
 블록 작성 규칙:
@@ -73,9 +72,9 @@ week 컬럼은 YYYYWW 형식입니다 (예: 202520 = 2025년 20주차). conv(전
    그 외 #, 별표 하나(*), -, |, `, > 같은 마크다운 기호나 이모지는 절대 쓰지 마세요.
 7. suggestions에는 이번 답변과 지금까지의 대화 맥락을 고려했을 때 사용자가 다음으로 물어보면 유용할 구체적인 질문 3개를 만드세요.
    데이터로 답할 수 있거나 추가 분석이 가능한, 실용적인 질문으로 작성하고, 이미 방금 답한 내용을 그대로 반복하는 질문은 피하세요.
-8. sources에는 이 답변의 근거를 정확히 밝히세요. CSV 데이터만으로 답했다면 ["대시보드"] 하나만 넣으세요.
-   웹 검색 결과를 근거로 사용했다면 실제로 참고한 기사/페이지의 URL을 추가하세요 (예: ["대시보드", "https://example.com/article"]).
-   데이터 없이 검색 결과만으로 답했다면 대시보드 없이 URL만 넣으세요. 실제로 사용하지 않은 근거는 절대 넣지 마세요.
+8. 각 블록의 source 필드에는 그 블록 내용의 근거를 표시하세요. CSV 데이터에서 나온 내용이면 source는 null로 두세요(화면에 아무것도 표시되지 않습니다).
+   웹 검색으로 찾은 내용이면 실제로 참고한 기사/페이지의 URL 하나를 source에 넣으세요. 여러 출처를 참고했다면 가장 핵심적인 URL 하나만 넣으세요.
+   CSV 데이터에서 나온 내용과 웹 검색으로 찾은 내용을 하나의 블록에 섞지 마세요 — 출처가 다르면 반드시 별도의 text 블록으로 나누고, 각 블록에 맞는 source를 넣으세요.
 
 데이터(CSV):
 {data_csv}
@@ -113,14 +112,18 @@ DEFAULT_SUGGESTIONS = [
 ]
 
 
-DEFAULT_SOURCES = ["대시보드"]
+def clean_source(raw_source) -> str | None:
+    if not isinstance(raw_source, str):
+        return None
+    s = raw_source.strip()
+    return s if re.match(r'^https?://', s) else None
 
 
 def parse_chat_response(raw: str):
     try:
         obj = json.loads(raw)
     except Exception:
-        return [{"type": "text", "content": strip_markdown(raw or "")}], DEFAULT_SUGGESTIONS, DEFAULT_SOURCES
+        return [{"type": "text", "content": strip_markdown(raw or ""), "source": None}], DEFAULT_SUGGESTIONS
 
     blocks = obj.get("blocks")
     if not isinstance(blocks, list):
@@ -131,10 +134,11 @@ def parse_chat_response(raw: str):
         if not isinstance(b, dict):
             continue
         btype = b.get("type")
+        source = clean_source(b.get("source"))
         if btype == "text":
             content = strip_markdown(str(b.get("content", "")))
             if content.strip():
-                cleaned.append({"type": "text", "content": content})
+                cleaned.append({"type": "text", "content": content, "source": source})
         elif btype == "table":
             headers = [strip_markdown(str(h)) for h in (b.get("headers") or [])]
             rows = [[strip_markdown(str(c)) for c in row] for row in (b.get("rows") or [])]
@@ -144,6 +148,7 @@ def parse_chat_response(raw: str):
                     "title": strip_markdown(str(b.get("title") or "")),
                     "headers": headers,
                     "rows": rows,
+                    "source": source,
                 })
         elif btype == "chart":
             data = b.get("data")
@@ -156,8 +161,9 @@ def parse_chat_response(raw: str):
                     "xKey": b.get("xKey") or "label",
                     "series": series,
                     "data": data,
+                    "source": source,
                 })
-    cleaned = cleaned or [{"type": "text", "content": "답변을 생성하지 못했습니다."}]
+    cleaned = cleaned or [{"type": "text", "content": "답변을 생성하지 못했습니다.", "source": None}]
 
     suggestions = []
     for s in (obj.get("suggestions") or []):
@@ -165,13 +171,7 @@ def parse_chat_response(raw: str):
             suggestions.append(strip_markdown(s.strip()))
     suggestions = suggestions[:3] or DEFAULT_SUGGESTIONS
 
-    sources = []
-    for s in (obj.get("sources") or []):
-        if isinstance(s, str) and s.strip():
-            sources.append(s.strip())
-    sources = sources[:5] or DEFAULT_SOURCES
-
-    return cleaned, suggestions, sources
+    return cleaned, suggestions
 
 
 def build_data_csv() -> str:
@@ -348,8 +348,8 @@ def chat(req: ChatRequest):
         raise HTTPException(500, "AI 응답 생성 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.")
 
     raw = resp.choices[0].message.content
-    blocks, suggestions, sources = parse_chat_response(raw)
-    return {"blocks": blocks, "suggestions": suggestions, "sources": sources}
+    blocks, suggestions = parse_chat_response(raw)
+    return {"blocks": blocks, "suggestions": suggestions}
 
 
 @app.get("/")

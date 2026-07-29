@@ -297,22 +297,6 @@ function renderHighlighted(text){
   });
 }
 
-function SourceLine({sources}){
-  if(!sources||!sources.length) return null;
-  return (
-    <div style={{marginTop:8,paddingTop:6,borderTop:'1px dashed var(--c-gray-light)',fontSize:11,color:'var(--c-gray-dark)'}}>
-      출처 : {sources.map((s,i)=>(
-        <React.Fragment key={i}>
-          {i>0 && ', '}
-          {/^https?:\/\//.test(s)?(
-            <a href={s} target="_blank" rel="noopener noreferrer" style={{color:'#1a56db',textDecoration:'underline'}}>{s}</a>
-          ):s}
-        </React.Fragment>
-      ))}
-    </div>
-  );
-}
-
 function flattenBlocks(blocks){
   return blocks.map(b=>{
     if(b.type==='table'){
@@ -327,6 +311,20 @@ function flattenBlocks(blocks){
   }).join('\n\n');
 }
 
+function SourceIcon({url}){
+  if(!url) return null;
+  return (
+    <a href={url} target="_blank" rel="noopener noreferrer" title="출처 보기"
+      style={{display:'inline-flex',verticalAlign:'middle',marginLeft:5,color:'#1a56db',flexShrink:0}}>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+        <polyline points="15 3 21 3 21 9"/>
+        <line x1="10" y1="14" x2="21" y2="3"/>
+      </svg>
+    </a>
+  );
+}
+
 function ChatBlocks({blocks}){
   return (
     <>
@@ -334,7 +332,7 @@ function ChatBlocks({blocks}){
         if(b.type==='table'){
           return (
             <div key={i} style={{margin:i===0?'0 0 6px':'6px 0',overflowX:'auto'}}>
-              {b.title && <div style={{fontSize:11,fontWeight:700,color:'var(--c-olive)',marginBottom:4}}>{b.title}</div>}
+              {b.title && <div style={{fontSize:11,fontWeight:700,color:'var(--c-olive)',marginBottom:4}}>{b.title}<SourceIcon url={b.source}/></div>}
               <table style={{borderCollapse:'collapse',fontSize:11,width:'100%'}}>
                 <thead>
                   <tr>{b.headers.map((h,hi)=><th key={hi} style={{textAlign:'left',padding:'4px 8px',borderBottom:'1px solid var(--c-gray-light)',color:'var(--c-gray-dark)',whiteSpace:'nowrap'}}>{h}</th>)}</tr>
@@ -345,6 +343,7 @@ function ChatBlocks({blocks}){
                   ))}
                 </tbody>
               </table>
+              {!b.title && <SourceIcon url={b.source}/>}
             </div>
           );
         }
@@ -352,7 +351,8 @@ function ChatBlocks({blocks}){
           const series=(b.series&&b.series.length)?b.series:[{key:'value',name:'값'}];
           return (
             <div key={i} style={{margin:i===0?'0 0 6px':'6px 0'}}>
-              {b.title && <div style={{fontSize:11,fontWeight:700,color:'var(--c-olive)',marginBottom:4}}>{b.title}</div>}
+              {b.title && <div style={{fontSize:11,fontWeight:700,color:'var(--c-olive)',marginBottom:4}}>{b.title}<SourceIcon url={b.source}/></div>}
+              {!b.title && <SourceIcon url={b.source}/>}
               <ResponsiveContainer width="100%" height={180}>
                 {b.chartType==='line'?(
                   <LineChart data={b.data} margin={{top:5,right:10,left:0,bottom:5}}>
@@ -377,7 +377,7 @@ function ChatBlocks({blocks}){
             </div>
           );
         }
-        return <div key={i} style={{whiteSpace:'pre-wrap',margin:i===0?0:'6px 0 0'}}>{renderHighlighted(b.content)}</div>;
+        return <div key={i} style={{whiteSpace:'pre-wrap',margin:i===0?0:'6px 0 0'}}>{renderHighlighted(b.content)}<SourceIcon url={b.source}/></div>;
       })}
     </>
   );
@@ -417,8 +417,7 @@ function ChatPanel(){
       return r.json();
     }).then(data=>{
       const blocks=Array.isArray(data.blocks)&&data.blocks.length?data.blocks:[{type:'text',content:'답변을 생성하지 못했습니다.'}];
-      const sources=Array.isArray(data.sources)&&data.sources.length?data.sources:['대시보드'];
-      setMessages(prev=>[...prev,{role:'assistant',content:flattenBlocks(blocks),blocks,sources}]);
+      setMessages(prev=>[...prev,{role:'assistant',content:flattenBlocks(blocks),blocks}]);
       if(Array.isArray(data.suggestions)&&data.suggestions.length) setSuggestions(data.suggestions);
     }).catch(e=>{
       setMessages(prev=>[...prev,{role:'assistant',content:'답변을 가져오지 못했습니다: '+e.message,error:true}]);
@@ -449,7 +448,6 @@ function ChatPanel(){
         {messages.map((m,i)=>(
           <div key={i} className={"chat-msg "+(m.role==='user'?'user':m.error?'error':'bot')}>
             {m.role==='assistant'&&m.blocks?<ChatBlocks blocks={m.blocks}/>:m.content}
-            {m.role==='assistant'&&!m.error&&<SourceLine sources={m.sources}/>}
           </div>
         ))}
         {sending && <div className="chat-msg pending">{CHAT_STAGES[stageIdx]}</div>}
