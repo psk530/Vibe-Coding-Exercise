@@ -1235,7 +1235,11 @@ function Dashboard(){
                 {(topModels||[]).map((m,i)=>(
                   <tr key={m.retailer_sku+'_'+i} style={{borderBottom:'1px solid var(--c-gray-light)'}}>
                     {MODEL_TABLE_COLUMNS.map(col=>(
-                      <td key={col.key} style={{padding:'7px 10px',textAlign:col.align,whiteSpace:'nowrap',fontWeight:col.sortable&&modelSort===col.key?700:400}}>{fmtModelCell(col,m)}</td>
+                      <td key={col.key} style={{padding:'7px 10px',textAlign:col.align,whiteSpace:'nowrap',fontWeight:col.sortable&&modelSort===col.key?700:400}}>
+                        {col.key==='retailer_sku'?(
+                          <a href={`https://www.amazon.com/dp/${m.retailer_sku}`} target="_blank" rel="noopener noreferrer" style={{color:'#1a56db',textDecoration:'underline'}}>{m.retailer_sku}</a>
+                        ):fmtModelCell(col,m)}
+                      </td>
                     ))}
                   </tr>
                 ))}
