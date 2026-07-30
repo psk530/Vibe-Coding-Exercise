@@ -50,6 +50,38 @@ body{background:var(--c-cream);color:var(--c-brown);font-family:-apple-system,Bl
 .header-badge{width:51px;height:51px;border-radius:50%;object-fit:cover;flex-shrink:0}
 .header h1{font-size:19px;font-weight:700;color:var(--c-brown)}
 .header p{font-size:12px;color:var(--c-gray-dark);margin-top:3px}
+.header-actions{margin-left:auto;display:flex;gap:8px;flex-shrink:0}
+.header-action-btn{background:#fff;border:1px solid var(--c-gray-light);border-radius:8px;padding:7px 16px;font-size:12px;font-weight:600;color:var(--c-brown);cursor:pointer;white-space:nowrap}
+.header-action-btn:hover{background:var(--c-pink)}
+.auth-page{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--c-cream)}
+.auth-card{background:#fff;border-radius:12px;padding:32px;width:340px;border:1px solid var(--c-gray-light);box-shadow:0 4px 20px rgba(71,66,46,.10)}
+.auth-title{font-size:18px;font-weight:700;color:var(--c-brown);margin-bottom:20px;text-align:center}
+.auth-input{width:100%;padding:10px 12px;margin-bottom:10px;border:1px solid var(--c-gray-light);border-radius:8px;font-size:13px;outline:none;font-family:inherit}
+.auth-input:focus{border-color:var(--c-red)}
+.auth-btn{width:100%;padding:10px;background:var(--c-red);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;margin-top:6px}
+.auth-btn:disabled{opacity:.6;cursor:default}
+.auth-error{color:var(--c-red);font-size:12px;margin-bottom:8px}
+.auth-msg{color:#1B8A2E;font-size:12px;margin-bottom:8px}
+.auth-link{text-align:center;margin-top:16px;font-size:12px;color:#1a56db;cursor:pointer;text-decoration:underline}
+.backoffice-page{min-height:100vh;background:var(--c-cream);padding:24px 28px}
+.backoffice-card{background:#fff;border-radius:12px;padding:24px;border:1px solid var(--c-gray-light);box-shadow:0 1px 2px rgba(71,66,46,.06);max-width:900px;margin:0 auto}
+.backoffice-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.backoffice-title{font-size:17px;font-weight:700;color:var(--c-brown)}
+.bo-table{width:100%;border-collapse:collapse;font-size:12px}
+.bo-table th{text-align:left;padding:8px 10px;border-bottom:2px solid var(--c-khaki);color:var(--c-gray-dark);white-space:nowrap}
+.bo-table td{padding:7px 10px;border-bottom:1px solid var(--c-gray-light);white-space:nowrap}
+.bo-badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600}
+.bo-badge.active{background:#e6f4ea;color:#1B8A2E}
+.bo-badge.inactive{background:#fde8e8;color:var(--c-red)}
+.bo-badge.admin{background:var(--c-pink);color:var(--c-red)}
+.bo-badge.user{background:var(--c-gray-light);color:var(--c-gray-dark)}
+.bo-btn{background:#fff;border:1px solid var(--c-gray-light);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;margin-right:4px;color:var(--c-brown)}
+.bo-btn:hover{background:var(--c-pink)}
+.bo-btn.danger{color:var(--c-red);border-color:var(--c-red)}
+.bo-field{margin-bottom:12px}
+.bo-field label{display:block;font-size:11px;color:var(--c-olive);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:5px}
+.bo-field input,.bo-field select{width:100%;padding:8px 10px;border:1px solid var(--c-gray-light);border-radius:8px;font-size:13px;outline:none;font-family:inherit}
+.bo-field input:focus,.bo-field select:focus{border-color:var(--c-red)}
 .filters{background:#fff;border:1px solid var(--c-gray-light);border-radius:12px;padding:14px 20px;margin-bottom:16px;display:flex;flex-wrap:wrap;gap:20px;align-items:flex-end;box-shadow:0 1px 2px rgba(71,66,46,.06)}
 .filter-group{display:flex;flex-direction:column;gap:6px}
 .filter-label{font-size:11px;color:var(--c-olive);text-transform:uppercase;letter-spacing:0.5px;font-weight:600}
@@ -469,7 +501,335 @@ function ChatPanel(){
   );
 }
 
-function Dashboard(){
+function LoginScreen({onLogin,onGoSignup}){
+  const [email,setEmail]=useState('');
+  const [password,setPassword]=useState('');
+  const [error,setError]=useState('');
+  const [loading,setLoading]=useState(false);
+
+  const submit=(e)=>{
+    e.preventDefault();
+    if(loading) return;
+    setError('');
+    setLoading(true);
+    fetch('/api/auth/login',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({email,password}),
+    }).then(async r=>{
+      const data=await r.json().catch(()=>({}));
+      if(!r.ok) throw new Error(data.detail||'로그인에 실패했습니다.');
+      return data;
+    }).then(onLogin)
+      .catch(e=>setError(e.message))
+      .finally(()=>setLoading(false));
+  };
+
+  return (
+    <div className="auth-page">
+      <div className="auth-card">
+        <div className="auth-title">US TV Market Dashboard</div>
+        <form onSubmit={submit}>
+          <input className="auth-input" type="text" placeholder="ID (이메일)" value={email} onChange={e=>setEmail(e.target.value)} autoFocus/>
+          <input className="auth-input" type="password" placeholder="PW" value={password} onChange={e=>setPassword(e.target.value)}/>
+          {error && <div className="auth-error">{error}</div>}
+          <button className="auth-btn" type="submit" disabled={loading}>Log in</button>
+        </form>
+        <div className="auth-link" onClick={onGoSignup}>Sign up</div>
+      </div>
+    </div>
+  );
+}
+
+function SignupScreen({onDone,onBack}){
+  const [name,setName]=useState('');
+  const [email,setEmail]=useState('');
+  const [password,setPassword]=useState('');
+  const [error,setError]=useState('');
+  const [loading,setLoading]=useState(false);
+
+  const submit=(e)=>{
+    e.preventDefault();
+    if(loading) return;
+    setError('');
+    setLoading(true);
+    fetch('/api/auth/signup',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({name,email,password}),
+    }).then(async r=>{
+      const data=await r.json().catch(()=>({}));
+      if(!r.ok) throw new Error(data.detail||'가입에 실패했습니다.');
+      return data;
+    }).then(()=>onDone())
+      .catch(e=>setError(e.message))
+      .finally(()=>setLoading(false));
+  };
+
+  return (
+    <div className="auth-page">
+      <div className="auth-card">
+        <div className="auth-title">회원가입</div>
+        <form onSubmit={submit}>
+          <input className="auth-input" type="text" placeholder="이름" value={name} onChange={e=>setName(e.target.value)} autoFocus/>
+          <input className="auth-input" type="text" placeholder="메일주소 (ID)" value={email} onChange={e=>setEmail(e.target.value)}/>
+          <input className="auth-input" type="password" placeholder="PW" value={password} onChange={e=>setPassword(e.target.value)}/>
+          {error && <div className="auth-error">{error}</div>}
+          <button className="auth-btn" type="submit" disabled={loading}>가입하기</button>
+        </form>
+        <div className="auth-link" onClick={onBack}>로그인 화면으로 돌아가기</div>
+      </div>
+    </div>
+  );
+}
+
+function fmtDateTime(iso){
+  if(!iso) return '-';
+  const d=new Date(iso);
+  return d.toLocaleString('ko-KR',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+}
+
+function AdminScreen({onBack,onLogout}){
+  const [users,setUsers]=useState(null);
+  const [error,setError]=useState('');
+  const [showCreate,setShowCreate]=useState(false);
+  const [editingUser,setEditingUser]=useState(null);
+  const [createForm,setCreateForm]=useState({name:'',email:'',password:'',role:'user',status:'active'});
+  const [editForm,setEditForm]=useState({name:'',email:'',role:'user'});
+
+  const load=()=>{
+    fetch('/api/admin/users').then(async r=>{
+      const data=await r.json().catch(()=>[]);
+      if(!r.ok) throw new Error(data.detail||'목록을 불러오지 못했습니다.');
+      return data;
+    }).then(setUsers).catch(e=>setError(e.message));
+  };
+
+  useEffect(()=>{ load(); },[]);
+
+  const createUser=(e)=>{
+    e.preventDefault();
+    setError('');
+    fetch('/api/admin/users',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(createForm),
+    }).then(async r=>{
+      const data=await r.json().catch(()=>({}));
+      if(!r.ok) throw new Error(data.detail||'등록에 실패했습니다.');
+      return data;
+    }).then(()=>{
+      setShowCreate(false);
+      setCreateForm({name:'',email:'',password:'',role:'user',status:'active'});
+      load();
+    }).catch(e=>setError(e.message));
+  };
+
+  const startEdit=(u)=>{
+    setEditingUser(u.id);
+    setEditForm({name:u.name,email:u.email,role:u.role});
+  };
+
+  const saveEdit=(e)=>{
+    e.preventDefault();
+    setError('');
+    fetch(`/api/admin/users/${editingUser}`,{
+      method:'PUT',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(editForm),
+    }).then(async r=>{
+      const data=await r.json().catch(()=>({}));
+      if(!r.ok) throw new Error(data.detail||'수정에 실패했습니다.');
+      return data;
+    }).then(()=>{ setEditingUser(null); load(); })
+      .catch(e=>setError(e.message));
+  };
+
+  const toggleStatus=(u)=>{
+    const next=u.status==='active'?'inactive':'active';
+    fetch(`/api/admin/users/${u.id}/status`,{
+      method:'PUT',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({status:next}),
+    }).then(async r=>{
+      if(!r.ok){ const data=await r.json().catch(()=>({})); throw new Error(data.detail||'상태 변경에 실패했습니다.'); }
+    }).then(load).catch(e=>setError(e.message));
+  };
+
+  const deleteUser=(u)=>{
+    if(!window.confirm(`${u.name}(${u.email}) 계정을 삭제할까요?`)) return;
+    fetch(`/api/admin/users/${u.id}`,{method:'DELETE'}).then(async r=>{
+      if(!r.ok){ const data=await r.json().catch(()=>({})); throw new Error(data.detail||'삭제에 실패했습니다.'); }
+    }).then(load).catch(e=>setError(e.message));
+  };
+
+  return (
+    <div className="backoffice-page">
+      <div className="backoffice-card">
+        <div className="backoffice-header">
+          <div className="backoffice-title">Admin — 사용자 관리</div>
+          <div style={{display:'flex',gap:8}}>
+            <button className="header-action-btn" onClick={()=>setShowCreate(s=>!s)}>{showCreate?'취소':'사용자 등록'}</button>
+            <button className="header-action-btn" onClick={onBack}>대시보드로</button>
+            <button className="header-action-btn" onClick={onLogout}>Logout</button>
+          </div>
+        </div>
+        {error && <div className="auth-error" style={{marginBottom:12}}>{error}</div>}
+
+        {showCreate && (
+          <form onSubmit={createUser} style={{border:'1px solid var(--c-gray-light)',borderRadius:8,padding:16,marginBottom:20}}>
+            <div className="bo-field"><label>이름</label><input value={createForm.name} onChange={e=>setCreateForm({...createForm,name:e.target.value})}/></div>
+            <div className="bo-field"><label>메일주소(ID)</label><input value={createForm.email} onChange={e=>setCreateForm({...createForm,email:e.target.value})}/></div>
+            <div className="bo-field"><label>비밀번호</label><input type="password" value={createForm.password} onChange={e=>setCreateForm({...createForm,password:e.target.value})}/></div>
+            <div className="bo-field"><label>권한등급</label>
+              <select value={createForm.role} onChange={e=>setCreateForm({...createForm,role:e.target.value})}>
+                <option value="user">사용자</option>
+                <option value="admin">관리자</option>
+              </select>
+            </div>
+            <div className="bo-field"><label>상태</label>
+              <select value={createForm.status} onChange={e=>setCreateForm({...createForm,status:e.target.value})}>
+                <option value="active">활성</option>
+                <option value="inactive">비활성</option>
+              </select>
+            </div>
+            <button className="auth-btn" type="submit">등록</button>
+          </form>
+        )}
+
+        <div style={{overflowX:'auto'}}>
+          <table className="bo-table">
+            <thead>
+              <tr>
+                <th>이름</th><th>ID(이메일)</th><th>권한등급</th><th>상태</th><th>가입일시</th><th>상태변경일시</th><th>관리</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(users||[]).map(u=>(
+                editingUser===u.id ? (
+                  <tr key={u.id}>
+                    <td colSpan={7}>
+                      <form onSubmit={saveEdit} style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',padding:'6px 0'}}>
+                        <input style={{width:100,padding:'5px 8px',border:'1px solid var(--c-gray-light)',borderRadius:6,fontSize:12}} value={editForm.name} onChange={e=>setEditForm({...editForm,name:e.target.value})}/>
+                        <input style={{width:180,padding:'5px 8px',border:'1px solid var(--c-gray-light)',borderRadius:6,fontSize:12}} value={editForm.email} onChange={e=>setEditForm({...editForm,email:e.target.value})}/>
+                        <select style={{padding:'5px 8px',border:'1px solid var(--c-gray-light)',borderRadius:6,fontSize:12}} value={editForm.role} onChange={e=>setEditForm({...editForm,role:e.target.value})}>
+                          <option value="user">사용자</option>
+                          <option value="admin">관리자</option>
+                        </select>
+                        <button className="bo-btn" type="submit">저장</button>
+                        <button className="bo-btn" type="button" onClick={()=>setEditingUser(null)}>취소</button>
+                      </form>
+                    </td>
+                  </tr>
+                ) : (
+                  <tr key={u.id}>
+                    <td>{u.name}</td>
+                    <td>{u.email}</td>
+                    <td><span className={"bo-badge "+(u.role==='admin'?'admin':'user')}>{u.role==='admin'?'관리자':'사용자'}</span></td>
+                    <td><span className={"bo-badge "+(u.status==='active'?'active':'inactive')}>{u.status==='active'?'활성':'비활성'}</span></td>
+                    <td>{fmtDateTime(u.created_at)}</td>
+                    <td>{fmtDateTime(u.status_changed_at)}</td>
+                    <td>
+                      <button className="bo-btn" onClick={()=>startEdit(u)}>정보변경</button>
+                      <button className="bo-btn" onClick={()=>toggleStatus(u)}>{u.status==='active'?'비활성화':'활성화'}</button>
+                      <button className="bo-btn danger" onClick={()=>deleteUser(u)}>삭제</button>
+                    </td>
+                  </tr>
+                )
+              ))}
+              {users&&users.length===0 && <tr><td colSpan={7} style={{color:'var(--c-gray-dark)'}}>등록된 사용자가 없습니다.</td></tr>}
+              {!users && <tr><td colSpan={7} style={{color:'var(--c-gray-dark)'}}>불러오는 중...</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProfileScreen({user,onBack,onLogout}){
+  const [currentPassword,setCurrentPassword]=useState('');
+  const [newPassword,setNewPassword]=useState('');
+  const [error,setError]=useState('');
+  const [msg,setMsg]=useState('');
+
+  const submit=(e)=>{
+    e.preventDefault();
+    setError(''); setMsg('');
+    fetch('/api/auth/me/password',{
+      method:'PUT',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({current_password:currentPassword,new_password:newPassword}),
+    }).then(async r=>{
+      const data=await r.json().catch(()=>({}));
+      if(!r.ok) throw new Error(data.detail||'변경에 실패했습니다.');
+      return data;
+    }).then(()=>{
+      setMsg('비밀번호가 변경되었습니다.');
+      setCurrentPassword(''); setNewPassword('');
+    }).catch(e=>setError(e.message));
+  };
+
+  return (
+    <div className="backoffice-page">
+      <div className="backoffice-card" style={{maxWidth:420}}>
+        <div className="backoffice-header">
+          <div className="backoffice-title">정보변경</div>
+          <div style={{display:'flex',gap:8}}>
+            <button className="header-action-btn" onClick={onBack}>대시보드로</button>
+            <button className="header-action-btn" onClick={onLogout}>Logout</button>
+          </div>
+        </div>
+        <div className="bo-field"><label>이름</label><div>{user.name}</div></div>
+        <div className="bo-field"><label>ID</label><div>{user.email}</div></div>
+        <div className="bo-field"><label>가입일시</label><div>{fmtDateTime(user.created_at)}</div></div>
+        <form onSubmit={submit} style={{marginTop:8,borderTop:'1px solid var(--c-gray-light)',paddingTop:16}}>
+          <div className="bo-field"><label>현재 비밀번호</label><input type="password" value={currentPassword} onChange={e=>setCurrentPassword(e.target.value)}/></div>
+          <div className="bo-field"><label>새 비밀번호</label><input type="password" value={newPassword} onChange={e=>setNewPassword(e.target.value)}/></div>
+          {error && <div className="auth-error">{error}</div>}
+          {msg && <div className="auth-msg">{msg}</div>}
+          <button className="auth-btn" type="submit">비밀번호 변경</button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function App(){
+  const [authState,setAuthState]=useState('loading');
+  const [user,setUser]=useState(null);
+  const [view,setView]=useState('dashboard');
+
+  useEffect(()=>{
+    fetch('/api/auth/me').then(r=>{
+      if(!r.ok) throw new Error('unauthenticated');
+      return r.json();
+    }).then(u=>{ setUser(u); setAuthState('app'); })
+      .catch(()=>setAuthState('login'));
+  },[]);
+
+  const handleLogout=()=>{
+    fetch('/api/auth/logout',{method:'POST'}).finally(()=>{
+      setUser(null);
+      setView('dashboard');
+      setAuthState('login');
+    });
+  };
+
+  if(authState==='loading') return <div style={{padding:40,color:'var(--c-gray-dark)'}}>로딩 중...</div>;
+  if(authState==='login') return <LoginScreen onLogin={(u)=>{setUser(u);setAuthState('app');}} onGoSignup={()=>setAuthState('signup')}/>;
+  if(authState==='signup') return <SignupScreen onDone={()=>setAuthState('login')} onBack={()=>setAuthState('login')}/>;
+
+  if(view==='admin' && user.role==='admin'){
+    return <AdminScreen onBack={()=>setView('dashboard')} onLogout={handleLogout}/>;
+  }
+  if(view==='profile'){
+    return <ProfileScreen user={user} onBack={()=>setView('dashboard')} onLogout={handleLogout}/>;
+  }
+  return <Dashboard user={user} onLogout={handleLogout} onAdminClick={()=>setView(user.role==='admin'?'admin':'profile')}/>;
+}
+
+function Dashboard({user,onLogout,onAdminClick}){
   const [sel,setSel]=useState(new Set(BRANDS));
   const [period,setPeriod]=useState('all');
   const [metric,setMetric]=useState('rev');
@@ -746,6 +1106,10 @@ function Dashboard(){
         <div>
           <h1>US TV Market — Brand Competition Dashboard</h1>
           <p>Amazon.com | TV Category | Weekly Data | Week 202401–202605</p>
+        </div>
+        <div className="header-actions">
+          <button className="header-action-btn" onClick={onAdminClick}>{user.role==='admin'?'Admin':'정보변경'}</button>
+          <button className="header-action-btn" onClick={onLogout}>Logout</button>
         </div>
       </div>
 
@@ -1359,7 +1723,7 @@ function Dashboard(){
   );
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<Dashboard/>);
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 </script>
 </body>
 </html>

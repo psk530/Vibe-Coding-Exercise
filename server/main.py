@@ -20,19 +20,308 @@ import re
 import sqlite3
 from pathlib import Path
 
+import bcrypt
 import httpx
-from fastapi import FastAPI, HTTPException
+import psycopg2
+import psycopg2.extras
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from openai import OpenAI
 from pydantic import BaseModel
+from starlette.middleware.sessions import SessionMiddleware
 
 ROOT = Path(__file__).resolve().parent.parent
 DB_PATH = ROOT / "db" / "dashboard.db"
 
 app = FastAPI(title="Brand Dashboard API")
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=os.environ.get("SESSION_SECRET_KEY", "dev-insecure-secret-change-me"),
+    same_site="lax",
+)
 
 CHAT_MODEL = os.environ.get("OPENROUTER_MODEL", "openai/gpt-4o")
+
+
+# ---------------------------------------------------------------------------
+# Auth / users (Postgres -- NOT the local SQLite file: Render's disk is wiped
+# on every deploy, so account data needs to live in an external DB to survive
+# the auto-deploy-on-every-push workflow this project uses).
+# ---------------------------------------------------------------------------
+
+def get_users_conn():
+    dsn = os.environ.get("DATABASE_URL")
+    if not dsn:
+        raise HTTPException(500, "DATABASE_URL이 서버에 설정되어 있지 않습니다.")
+    return psycopg2.connect(dsn)
+
+
+@app.on_event("startup")
+def init_users_table():
+    dsn = os.environ.get("DATABASE_URL")
+    if not dsn:
+        print("DATABASE_URL not set -- skipping users table init (auth endpoints will 500 until it's configured)")
+        return
+    conn = psycopg2.connect(dsn)
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS users (
+                    id SERIAL PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    email TEXT UNIQUE NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    role TEXT NOT NULL DEFAULT 'user',
+                    status TEXT NOT NULL DEFAULT 'active',
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                    status_changed_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                )
+                """
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def hash_password(pw: str) -> str:
+    return bcrypt.hashpw(pw.encode(), bcrypt.gensalt()).decode()
+
+
+def verify_password(pw: str, hashed: str) -> bool:
+    try:
+        return bcrypt.checkpw(pw.encode(), hashed.encode())
+    except Exception:
+        return False
+
+
+PUBLIC_USER_FIELDS = "id, name, email, role, status, created_at, status_changed_at"
+
+
+def get_current_user(request: Request) -> dict:
+    user_id = request.session.get("user_id")
+    if not user_id:
+        raise HTTPException(401, "로그인이 필요합니다.")
+    conn = get_users_conn()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(f"SELECT {PUBLIC_USER_FIELDS} FROM users WHERE id=%s", (user_id,))
+            user = cur.fetchone()
+    finally:
+        conn.close()
+    if not user or user["status"] != "active":
+        request.session.clear()
+        raise HTTPException(401, "로그인이 필요합니다.")
+    return dict(user)
+
+
+def require_admin(user: dict = Depends(get_current_user)) -> dict:
+    if user["role"] != "admin":
+        raise HTTPException(403, "관리자 권한이 필요합니다.")
+    return user
+
+
+class SignupRequest(BaseModel):
+    name: str
+    email: str
+    password: str
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
+class AdminUserCreateRequest(BaseModel):
+    name: str
+    email: str
+    password: str
+    role: str = "user"
+    status: str = "active"
+
+
+class AdminUserUpdateRequest(BaseModel):
+    name: str | None = None
+    email: str | None = None
+    role: str | None = None
+
+
+class AdminStatusRequest(BaseModel):
+    status: str
+
+
+@app.post("/api/auth/signup")
+def signup(req: SignupRequest):
+    name = req.name.strip()
+    email = req.email.strip().lower()
+    if not name or not email or len(req.password) < 4:
+        raise HTTPException(400, "이름, 이메일, 4자 이상의 비밀번호를 입력해주세요.")
+    conn = get_users_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1 FROM users WHERE email=%s", (email,))
+            if cur.fetchone():
+                raise HTTPException(400, "이미 가입된 이메일입니다.")
+            cur.execute(
+                "INSERT INTO users (name, email, password_hash, role, status) VALUES (%s,%s,%s,'user','active')",
+                (name, email, hash_password(req.password)),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+    return {"ok": True}
+
+
+@app.post("/api/auth/login")
+def login(req: LoginRequest, request: Request):
+    conn = get_users_conn()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT * FROM users WHERE email=%s", (req.email.strip().lower(),))
+            user = cur.fetchone()
+    finally:
+        conn.close()
+    if not user or not verify_password(req.password, user["password_hash"]):
+        raise HTTPException(401, "이메일 또는 비밀번호가 올바르지 않습니다.")
+    if user["status"] != "active":
+        raise HTTPException(403, "비활성화된 계정입니다. 관리자에게 문의하세요.")
+    request.session["user_id"] = user["id"]
+    return {
+        "id": user["id"], "name": user["name"], "email": user["email"],
+        "role": user["role"], "created_at": user["created_at"].isoformat(),
+    }
+
+
+@app.post("/api/auth/logout")
+def logout(request: Request):
+    request.session.clear()
+    return {"ok": True}
+
+
+@app.get("/api/auth/me")
+def me(user: dict = Depends(get_current_user)):
+    return {
+        "id": user["id"], "name": user["name"], "email": user["email"],
+        "role": user["role"], "created_at": user["created_at"].isoformat(),
+    }
+
+
+@app.put("/api/auth/me/password")
+def change_my_password(req: ChangePasswordRequest, user: dict = Depends(get_current_user)):
+    if len(req.new_password) < 4:
+        raise HTTPException(400, "새 비밀번호는 4자 이상이어야 합니다.")
+    conn = get_users_conn()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT password_hash FROM users WHERE id=%s", (user["id"],))
+            row = cur.fetchone()
+            if not row or not verify_password(req.current_password, row["password_hash"]):
+                raise HTTPException(400, "현재 비밀번호가 올바르지 않습니다.")
+            cur.execute("UPDATE users SET password_hash=%s WHERE id=%s", (hash_password(req.new_password), user["id"]))
+        conn.commit()
+    finally:
+        conn.close()
+    return {"ok": True}
+
+
+@app.get("/api/admin/users")
+def admin_list_users(admin: dict = Depends(require_admin)):
+    conn = get_users_conn()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(f"SELECT {PUBLIC_USER_FIELDS} FROM users ORDER BY created_at")
+            rows = cur.fetchall()
+    finally:
+        conn.close()
+    return [
+        {**dict(r), "created_at": r["created_at"].isoformat(), "status_changed_at": r["status_changed_at"].isoformat()}
+        for r in rows
+    ]
+
+
+@app.post("/api/admin/users")
+def admin_create_user(req: AdminUserCreateRequest, admin: dict = Depends(require_admin)):
+    name = req.name.strip()
+    email = req.email.strip().lower()
+    if not name or not email or len(req.password) < 4:
+        raise HTTPException(400, "이름, 이메일, 4자 이상의 비밀번호를 입력해주세요.")
+    if req.role not in ("user", "admin") or req.status not in ("active", "inactive"):
+        raise HTTPException(400, "잘못된 값입니다.")
+    conn = get_users_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1 FROM users WHERE email=%s", (email,))
+            if cur.fetchone():
+                raise HTTPException(400, "이미 존재하는 이메일입니다.")
+            cur.execute(
+                "INSERT INTO users (name, email, password_hash, role, status) VALUES (%s,%s,%s,%s,%s)",
+                (name, email, hash_password(req.password), req.role, req.status),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+    return {"ok": True}
+
+
+@app.put("/api/admin/users/{user_id}")
+def admin_update_user(user_id: int, req: AdminUserUpdateRequest, admin: dict = Depends(require_admin)):
+    fields, params = [], []
+    if req.name is not None:
+        fields.append("name=%s")
+        params.append(req.name.strip())
+    if req.email is not None:
+        fields.append("email=%s")
+        params.append(req.email.strip().lower())
+    if req.role is not None:
+        if req.role not in ("user", "admin"):
+            raise HTTPException(400, "잘못된 권한 값입니다.")
+        fields.append("role=%s")
+        params.append(req.role)
+    if not fields:
+        return {"ok": True}
+    params.append(user_id)
+    conn = get_users_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(f"UPDATE users SET {', '.join(fields)} WHERE id=%s", params)
+        conn.commit()
+    finally:
+        conn.close()
+    return {"ok": True}
+
+
+@app.put("/api/admin/users/{user_id}/status")
+def admin_update_status(user_id: int, req: AdminStatusRequest, admin: dict = Depends(require_admin)):
+    if req.status not in ("active", "inactive"):
+        raise HTTPException(400, "잘못된 상태 값입니다.")
+    conn = get_users_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE users SET status=%s, status_changed_at=now() WHERE id=%s", (req.status, user_id))
+        conn.commit()
+    finally:
+        conn.close()
+    return {"ok": True}
+
+
+@app.delete("/api/admin/users/{user_id}")
+def admin_delete_user(user_id: int, admin: dict = Depends(require_admin)):
+    if user_id == admin["id"]:
+        raise HTTPException(400, "본인 계정은 삭제할 수 없습니다.")
+    conn = get_users_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM users WHERE id=%s", (user_id,))
+        conn.commit()
+    finally:
+        conn.close()
+    return {"ok": True}
 
 
 def get_openrouter_client() -> OpenAI:
@@ -258,7 +547,7 @@ def get_conn():
 
 
 @app.get("/api/weekly")
-def weekly():
+def weekly(user: dict = Depends(get_current_user)):
     conn = get_conn()
     rows = conn.execute(
         "SELECT week_id AS week, brand, rev, units, traffic, organic FROM weekly_sales ORDER BY week_id, brand"
@@ -268,7 +557,7 @@ def weekly():
 
 
 @app.get("/api/totals")
-def totals():
+def totals(user: dict = Depends(get_current_user)):
     conn = get_conn()
     rows = conn.execute(
         """
@@ -317,7 +606,7 @@ TOP_MODELS_SORT_COLUMNS = {
 
 
 @app.get("/api/os_share")
-def os_share(period: str = "all"):
+def os_share(period: str = "all", user: dict = Depends(get_current_user)):
     where_clause, params = period_where(period)
     conn = get_conn()
     rows = conn.execute(
@@ -335,7 +624,7 @@ def os_share(period: str = "all"):
 
 
 @app.get("/api/top_models")
-def top_models(period: str = "all", sort: str = "units_sold", limit: int = 15):
+def top_models(period: str = "all", sort: str = "units_sold", limit: int = 15, user: dict = Depends(get_current_user)):
     sort_col = TOP_MODELS_SORT_COLUMNS.get(sort)
     if sort_col is None:
         raise HTTPException(400, "잘못된 sort 값입니다.")
@@ -398,7 +687,7 @@ def call_chat_model(client: OpenAI, messages: list):
 
 
 @app.post("/api/chat")
-def chat(req: ChatRequest):
+def chat(req: ChatRequest, user: dict = Depends(get_current_user)):
     client = get_openrouter_client()
 
     system = CHAT_SYSTEM_TEMPLATE.format(data_csv=build_data_csv())

@@ -4,3 +4,6 @@ pandas
 openpyxl
 openai
 httpx
+psycopg2-binary
+bcrypt
+itsdangerous
