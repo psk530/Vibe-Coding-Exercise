@@ -61,7 +61,8 @@ week 컬럼은 YYYYWW 형식입니다 (예: 202520 = 2025년 20주차). conv(전
 1. 매출/트래픽/판매량/전환율 등 데이터에서 직접 확인 가능한 수치는 CSV를 근거로 정확히 계산해서 답하세요.
 2. "왜 ~했는지", "원인이 뭐야" 같은 질문에는 먼저 CSV 데이터 안에서 근거(전후 주차 대비 변화, 다른 브랜드와의 비교, 계절성 등)를 찾아 분석하고,
    검색으로 얻은 최신 뉴스/기사(신제품 출시, 프로모션, 이벤트, 시즌 세일 등)가 있다면 근거로 함께 활용하세요.
-   출처를 밝힐 때는 "[텍스트](URL)" 같은 마크다운 링크 문법을 쓰지 말고, "OO 매체에 따르면"처럼 자연스러운 문장으로 녹여서 표현하세요.
+   URL이나 도메인 이름(예: example.com)은 content 문자열 안에 절대 직접 쓰지 마세요 — "[텍스트](URL)" 마크다운 링크 문법도 금지입니다.
+   출처는 "OO 매체에 따르면"처럼 자연스러운 문장으로만 언급하고, 실제 URL은 반드시 아래 8번 규칙대로 source 필드에만 넣으세요.
 3. 여러 주차나 여러 브랜드에 걸친 수치 비교/추이는 text로 나열하지 말고 table 또는 chart 블록으로 표현해서 가독성을 높이세요.
    시간 흐름(주차별 추이)에는 chart(line)를, 브랜드 간 비교에는 chart(bar) 또는 table을 우선 사용하세요.
    설명, 원인 분석, 결론처럼 표/차트로 표현하기 어려운 내용은 text 블록으로 쓰세요.
@@ -120,6 +121,38 @@ def clean_source(raw_source) -> str | None:
     return s if re.match(r'^https?://', s) else None
 
 
+URL_RE = re.compile(r'https?://[^\s)\]]+')
+# Common leftover pattern from a markdown-link conversion: "kpinews.kr (https://...)"
+# -- a bare domain-name mention sitting right before the URL it names.
+DOMAIN_THEN_URL_RE = re.compile(r'\S{1,30}\.[a-zA-Z]{2,6}\s*\(\s*(https?://[^\s)\]]+)\s*\)')
+
+
+def extract_and_strip_urls(text: str):
+    """Safety net for when the model writes a URL inline instead of using the
+    block's `source` field (e.g. leftover from a markdown-link conversion).
+    Pulls the first URL out to use as the source and removes all URL text --
+    plus a bare domain-name mention immediately preceding it, if present --
+    from the visible content."""
+    urls = []
+
+    def _domain_sub(m):
+        urls.append(m.group(1))
+        return ''
+
+    cleaned = DOMAIN_THEN_URL_RE.sub(_domain_sub, text)
+    bare_urls = URL_RE.findall(cleaned)
+    if bare_urls:
+        urls.extend(bare_urls)
+        cleaned = URL_RE.sub('', cleaned)
+    if not urls:
+        return text, None
+    cleaned = re.sub(r'\(\s*\)', '', cleaned)
+    cleaned = re.sub(r'[ \t]+([,.!?])', r'\1', cleaned)
+    cleaned = re.sub(r'[ \t]{2,}', ' ', cleaned)
+    cleaned = re.sub(r'\n{3,}', '\n\n', cleaned)
+    return cleaned.strip(), urls[0]
+
+
 def url_is_reachable(url: str, timeout: float = 4.0) -> bool:
     """LLM-cited URLs are sometimes reconstructed/hallucinated rather than copied
     verbatim from search results, so a link-icon can point at a 404. Verify live
@@ -151,7 +184,8 @@ def parse_chat_response(raw: str):
     try:
         obj = json.loads(raw)
     except Exception:
-        return [{"type": "text", "content": strip_markdown(raw or ""), "source": None}], DEFAULT_SUGGESTIONS
+        content, extracted_url = extract_and_strip_urls(strip_markdown(raw or ""))
+        return [{"type": "text", "content": content, "source": extracted_url}], DEFAULT_SUGGESTIONS
 
     blocks = obj.get("blocks")
     if not isinstance(blocks, list):
@@ -165,6 +199,8 @@ def parse_chat_response(raw: str):
         source = clean_source(b.get("source"))
         if btype == "text":
             content = strip_markdown(str(b.get("content", "")))
+            content, extracted_url = extract_and_strip_urls(content)
+            source = source or extracted_url
             if content.strip():
                 cleaned.append({"type": "text", "content": content, "source": source})
         elif btype == "table":
