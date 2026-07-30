@@ -20,6 +20,7 @@ import re
 import sqlite3
 from pathlib import Path
 
+import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -119,6 +120,33 @@ def clean_source(raw_source) -> str | None:
     return s if re.match(r'^https?://', s) else None
 
 
+def url_is_reachable(url: str, timeout: float = 4.0) -> bool:
+    """LLM-cited URLs are sometimes reconstructed/hallucinated rather than copied
+    verbatim from search results, so a link-icon can point at a 404. Verify live
+    before showing it rather than trusting the model's citation blindly."""
+    try:
+        with httpx.Client(follow_redirects=True, timeout=timeout) as client:
+            resp = client.head(url)
+            if resp.status_code == 405:  # some sites reject HEAD; retry with GET
+                resp = client.get(url)
+            return resp.status_code < 400
+    except Exception:
+        return False
+
+
+def drop_dead_sources(blocks: list) -> list:
+    cache: dict[str, bool] = {}
+    for b in blocks:
+        url = b.get("source")
+        if not url:
+            continue
+        if url not in cache:
+            cache[url] = url_is_reachable(url)
+        if not cache[url]:
+            b["source"] = None
+    return blocks
+
+
 def parse_chat_response(raw: str):
     try:
         obj = json.loads(raw)
@@ -164,6 +192,7 @@ def parse_chat_response(raw: str):
                     "source": source,
                 })
     cleaned = cleaned or [{"type": "text", "content": "답변을 생성하지 못했습니다.", "source": None}]
+    cleaned = drop_dead_sources(cleaned)
 
     suggestions = []
     for s in (obj.get("suggestions") or []):
