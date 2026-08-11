@@ -59,30 +59,36 @@ def get_users_conn():
 
 @app.on_event("startup")
 def init_users_table():
+    # Best-effort only: a Postgres outage (e.g. a paused free-tier Supabase
+    # project) must NOT take down the rest of the dashboard, which doesn't
+    # depend on it. Auth endpoints will just 500 individually until it's back.
     dsn = os.environ.get("DATABASE_URL")
     if not dsn:
         print("DATABASE_URL not set -- skipping users table init (auth endpoints will 500 until it's configured)")
         return
-    conn = psycopg2.connect(dsn)
     try:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                CREATE TABLE IF NOT EXISTS users (
-                    id SERIAL PRIMARY KEY,
-                    name TEXT NOT NULL,
-                    email TEXT UNIQUE NOT NULL,
-                    password_hash TEXT NOT NULL,
-                    role TEXT NOT NULL DEFAULT 'user',
-                    status TEXT NOT NULL DEFAULT 'active',
-                    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-                    status_changed_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        conn = psycopg2.connect(dsn, connect_timeout=5)
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS users (
+                        id SERIAL PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        email TEXT UNIQUE NOT NULL,
+                        password_hash TEXT NOT NULL,
+                        role TEXT NOT NULL DEFAULT 'user',
+                        status TEXT NOT NULL DEFAULT 'active',
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                        status_changed_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                    )
+                    """
                 )
-                """
-            )
-        conn.commit()
-    finally:
-        conn.close()
+            conn.commit()
+        finally:
+            conn.close()
+    except Exception as e:
+        print(f"WARNING: could not initialize users table (auth will be unavailable until this is fixed): {e!r}")
 
 
 def hash_password(pw: str) -> str:
