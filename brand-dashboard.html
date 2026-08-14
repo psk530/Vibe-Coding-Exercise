@@ -760,9 +760,9 @@ function AdminScreen({onBack,onLogout}){
               {(users||[]).map(u=>(
                 editingUser===u.id ? (
                   <tr key={u.id}>
-                    <td><input style={{width:'100%',padding:'5px 8px',border:'1px solid var(--c-gray-light)',borderRadius:6,fontSize:12}} value={editForm.name} onChange={e=>setEditForm({...editForm,name:e.target.value})}/></td>
-                    <td><input style={{width:'100%',padding:'5px 8px',border:'1px solid var(--c-gray-light)',borderRadius:6,fontSize:12}} value={editForm.email} onChange={e=>setEditForm({...editForm,email:e.target.value})}/></td>
-                    <td><input type="password" placeholder="새 비밀번호(변경시에만)" style={{width:'100%',padding:'5px 8px',border:'1px solid var(--c-gray-light)',borderRadius:6,fontSize:12}} value={editForm.password} onChange={e=>setEditForm({...editForm,password:e.target.value})}/></td>
+                    <td><input autoComplete="off" style={{width:'100%',padding:'5px 8px',border:'1px solid var(--c-gray-light)',borderRadius:6,fontSize:12}} value={editForm.name} onChange={e=>setEditForm({...editForm,name:e.target.value})}/></td>
+                    <td><input autoComplete="off" style={{width:'100%',padding:'5px 8px',border:'1px solid var(--c-gray-light)',borderRadius:6,fontSize:12}} value={editForm.email} onChange={e=>setEditForm({...editForm,email:e.target.value})}/></td>
+                    <td><input type="password" placeholder="새 비밀번호(변경시에만)" autoComplete="new-password" style={{width:'100%',padding:'5px 8px',border:'1px solid var(--c-gray-light)',borderRadius:6,fontSize:12}} value={editForm.password} onChange={e=>setEditForm({...editForm,password:e.target.value})}/></td>
                     <td>
                       <select style={{width:'100%',padding:'5px 8px',border:'1px solid var(--c-gray-light)',borderRadius:6,fontSize:12}} value={editForm.status} onChange={e=>setEditForm({...editForm,status:e.target.value})}>
                         <option value="active">YES</option>
@@ -845,8 +845,8 @@ function ProfileScreen({user,onBack,onLogout}){
         <div className="bo-field"><label>ID</label><div>{user.email}</div></div>
         <div className="bo-field"><label>가입일시</label><div>{fmtDateTime(user.created_at)}</div></div>
         <form onSubmit={submit} style={{marginTop:8,borderTop:'1px solid var(--c-gray-light)',paddingTop:16}}>
-          <div className="bo-field"><label>현재 비밀번호</label><input type="password" value={currentPassword} onChange={e=>setCurrentPassword(e.target.value)}/></div>
-          <div className="bo-field"><label>새 비밀번호</label><input type="password" value={newPassword} onChange={e=>setNewPassword(e.target.value)}/></div>
+          <div className="bo-field"><label>현재 비밀번호</label><input type="password" autoComplete="current-password" value={currentPassword} onChange={e=>setCurrentPassword(e.target.value)}/></div>
+          <div className="bo-field"><label>새 비밀번호</label><input type="password" autoComplete="new-password" value={newPassword} onChange={e=>setNewPassword(e.target.value)}/></div>
           {error && <div className="auth-error">{error}</div>}
           {msg && <div className="auth-msg">{msg}</div>}
           <button className="auth-btn" type="submit">비밀번호 변경</button>
