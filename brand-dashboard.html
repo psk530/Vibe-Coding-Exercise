@@ -64,7 +64,7 @@ body{background:var(--c-cream);color:var(--c-brown);font-family:-apple-system,Bl
 .auth-msg{color:#1B8A2E;font-size:12px;margin-bottom:8px}
 .auth-link{text-align:center;margin-top:16px;font-size:12px;color:#1a56db;cursor:pointer;text-decoration:underline}
 .backoffice-page{min-height:100vh;background:var(--c-cream);padding:24px 28px}
-.backoffice-card{background:#fff;border-radius:12px;padding:24px;border:1px solid var(--c-gray-light);box-shadow:0 1px 2px rgba(71,66,46,.06);max-width:900px;margin:0 auto}
+.backoffice-card{background:#fff;border-radius:12px;padding:24px;border:1px solid var(--c-gray-light);box-shadow:0 1px 2px rgba(71,66,46,.06);max-width:1200px;margin:0 auto}
 .backoffice-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
 .backoffice-title{font-size:17px;font-weight:700;color:var(--c-brown)}
 .bo-table{width:100%;border-collapse:collapse;font-size:12px}
@@ -742,7 +742,7 @@ function AdminScreen({onBack,onLogout}){
           <table className="bo-table">
             <thead>
               <tr>
-                <th>이름</th><th>ID(이메일)</th><th>PW</th><th>권한등급</th><th>관리</th><th>가입일시</th><th>상태변경일시</th><th>활성여부</th>
+                <th>이름</th><th>ID(이메일)</th><th>PW</th><th>활성여부</th><th>권한등급</th><th>가입일시</th><th>상태변경일시</th><th>관리</th>
               </tr>
             </thead>
             <tbody>
@@ -772,14 +772,14 @@ function AdminScreen({onBack,onLogout}){
                     <td>{u.name}</td>
                     <td>{u.email}</td>
                     <td>••••••••</td>
+                    <td><span className={"bo-badge "+(u.status==='active'?'active':'inactive')}>{u.status==='active'?'YES':'NO'}</span></td>
                     <td><span className={"bo-badge "+(u.role==='admin'?'admin':'user')}>{u.role==='admin'?'관리자':'사용자'}</span></td>
+                    <td>{fmtDateTime(u.created_at)}</td>
+                    <td>{fmtDateTime(u.status_changed_at)}</td>
                     <td>
                       <button className="bo-btn" onClick={()=>startEdit(u)}>정보변경</button>
                       <button className="bo-btn danger" onClick={()=>deleteUser(u)}>삭제</button>
                     </td>
-                    <td>{fmtDateTime(u.created_at)}</td>
-                    <td>{fmtDateTime(u.status_changed_at)}</td>
-                    <td><span className={"bo-badge "+(u.status==='active'?'active':'inactive')}>{u.status==='active'?'YES':'NO'}</span></td>
                   </tr>
                 )
               ))}
