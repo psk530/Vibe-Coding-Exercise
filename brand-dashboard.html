@@ -625,10 +625,12 @@ function SignupScreen({onDone,onBack}){
     <div className="auth-page">
       <div className="auth-card">
         <div className="auth-title">회원가입</div>
-        <form onSubmit={submit}>
-          <input className="auth-input" type="text" placeholder="이름" value={name} onChange={e=>setName(e.target.value)} autoFocus/>
-          <input className="auth-input" type="text" placeholder="메일주소 (ID)" value={email} onChange={e=>setEmail(e.target.value)}/>
-          <input className="auth-input" type="password" placeholder="PW" value={password} onChange={e=>setPassword(e.target.value)}/>
+        <form onSubmit={submit} autoComplete="off">
+          <input type="text" name="fakeusernameremembered" autoComplete="off" style={{display:'none'}} tabIndex={-1} aria-hidden="true"/>
+          <input type="password" name="fakepasswordremembered" autoComplete="off" style={{display:'none'}} tabIndex={-1} aria-hidden="true"/>
+          <input className="auth-input" type="text" placeholder="이름" autoComplete="off" value={name} onChange={e=>setName(e.target.value)} autoFocus/>
+          <input className="auth-input" type="text" placeholder="메일주소 (ID)" autoComplete="off" value={email} onChange={e=>setEmail(e.target.value)}/>
+          <input className="auth-input" type="password" placeholder="PW" autoComplete="new-password" value={password} onChange={e=>setPassword(e.target.value)}/>
           {error && <div className="auth-error">{error}</div>}
           <button className="auth-btn" type="submit" disabled={loading}>가입하기</button>
         </form>
