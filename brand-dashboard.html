@@ -82,6 +82,11 @@ body{background:var(--c-cream);color:var(--c-brown);font-family:-apple-system,Bl
 .bo-field label{display:block;font-size:11px;color:var(--c-olive);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:5px}
 .bo-field input,.bo-field select{width:100%;padding:8px 10px;border:1px solid var(--c-gray-light);border-radius:8px;font-size:13px;outline:none;font-family:inherit}
 .bo-field input:focus,.bo-field select:focus{border-color:var(--c-red)}
+input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus{
+  -webkit-box-shadow:0 0 0px 1000px #fff inset;
+  -webkit-text-fill-color:var(--c-brown);
+  transition:background-color 5000s ease-in-out 0s;
+}
 .filters{background:#fff;border:1px solid var(--c-gray-light);border-radius:12px;padding:14px 20px;margin-bottom:16px;display:flex;flex-wrap:wrap;gap:20px;align-items:flex-end;box-shadow:0 1px 2px rgba(71,66,46,.06)}
 .filter-group{display:flex;flex-direction:column;gap:6px}
 .filter-label{font-size:11px;color:var(--c-olive);text-transform:uppercase;letter-spacing:0.5px;font-weight:600}
@@ -717,23 +722,23 @@ function AdminScreen({onBack,onLogout}){
         {error && <div className="auth-error" style={{marginBottom:12}}>{error}</div>}
 
         {showCreate && (
-          <form onSubmit={createUser} style={{border:'1px solid var(--c-gray-light)',borderRadius:8,padding:16,marginBottom:20}}>
-            <div className="bo-field"><label>이름</label><input value={createForm.name} onChange={e=>setCreateForm({...createForm,name:e.target.value})}/></div>
-            <div className="bo-field"><label>메일주소(ID)</label><input value={createForm.email} onChange={e=>setCreateForm({...createForm,email:e.target.value})}/></div>
-            <div className="bo-field"><label>비밀번호</label><input type="password" value={createForm.password} onChange={e=>setCreateForm({...createForm,password:e.target.value})}/></div>
-            <div className="bo-field"><label>권한등급</label>
+          <form onSubmit={createUser} autoComplete="off" style={{border:'1px solid var(--c-gray-light)',borderRadius:8,padding:16,marginBottom:20,display:'flex',gap:12,alignItems:'flex-end',flexWrap:'wrap'}}>
+            <div className="bo-field" style={{width:140,margin:0}}><label>이름</label><input autoComplete="off" value={createForm.name} onChange={e=>setCreateForm({...createForm,name:e.target.value})}/></div>
+            <div className="bo-field" style={{width:220,margin:0}}><label>메일주소(ID)</label><input autoComplete="off" value={createForm.email} onChange={e=>setCreateForm({...createForm,email:e.target.value})}/></div>
+            <div className="bo-field" style={{width:160,margin:0}}><label>비밀번호</label><input type="password" autoComplete="new-password" value={createForm.password} onChange={e=>setCreateForm({...createForm,password:e.target.value})}/></div>
+            <div className="bo-field" style={{width:110,margin:0}}><label>권한등급</label>
               <select value={createForm.role} onChange={e=>setCreateForm({...createForm,role:e.target.value})}>
                 <option value="user">사용자</option>
                 <option value="admin">관리자</option>
               </select>
             </div>
-            <div className="bo-field"><label>상태</label>
+            <div className="bo-field" style={{width:100,margin:0}}><label>상태</label>
               <select value={createForm.status} onChange={e=>setCreateForm({...createForm,status:e.target.value})}>
                 <option value="active">활성</option>
                 <option value="inactive">비활성</option>
               </select>
             </div>
-            <button className="auth-btn" type="submit">등록</button>
+            <button type="submit" style={{padding:'8px 22px',background:'var(--c-red)',color:'#fff',border:'none',borderRadius:8,fontSize:13,fontWeight:700,cursor:'pointer',height:34}}>등록</button>
           </form>
         )}
 
