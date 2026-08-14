@@ -92,11 +92,15 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
 .filter-label{font-size:11px;color:var(--c-olive);text-transform:uppercase;letter-spacing:0.5px;font-weight:600}
 .filter-select{background:#fff;border:1px solid var(--c-gray-light);color:var(--c-brown);border-radius:8px;padding:6px 12px;font-size:13px;cursor:pointer;outline:none}
 .filter-select:focus{border-color:var(--c-red)}
-.brand-pills{display:flex;flex-wrap:wrap;gap:6px}
-.brand-pill{padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid;transition:all 0.15s;opacity:0.4;background:#fff}
-.brand-pill.active{opacity:1}
-.select-all-pill{padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px dashed var(--c-olive);color:var(--c-gray-dark);background:var(--c-pink);flex-shrink:0;transition:background 0.15s}
-.select-all-pill:hover{background:#f8dde4}
+.brand-dropdown-trigger{background:#fff;border:1px solid var(--c-gray-light);color:var(--c-brown);border-radius:8px;padding:6px 12px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:10px;min-width:170px;justify-content:space-between;font-family:inherit}
+.brand-dropdown-trigger:hover{border-color:var(--c-olive)}
+.brand-dropdown-caret{font-size:10px;color:var(--c-gray-dark);flex-shrink:0}
+.brand-dropdown-panel{position:absolute;top:calc(100% + 4px);left:0;background:#fff;border:1px solid var(--c-gray-light);border-radius:8px;box-shadow:0 4px 16px rgba(71,66,46,.15);padding:6px;z-index:50;min-width:190px;max-height:280px;overflow-y:auto}
+.brand-dropdown-item{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;font-size:13px;color:var(--c-brown);cursor:pointer}
+.brand-dropdown-item:hover{background:var(--c-pink)}
+.brand-dropdown-item input{cursor:pointer;flex-shrink:0}
+.brand-dropdown-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.brand-dropdown-divider{height:1px;background:var(--c-gray-light);margin:4px 2px}
 .insight-item{font-size:13px;line-height:1.6;color:var(--c-brown);padding-left:14px;position:relative}
 .insight-item::before{content:'';position:absolute;left:0;top:8px;width:5px;height:5px;border-radius:50%;background:var(--c-red)}
 .chart-header-insight{font-size:12px;color:var(--c-gray-dark);text-align:left;line-height:1.5;font-style:italic}
@@ -895,6 +899,8 @@ function Dashboard({user,onLogout,onAdminClick}){
   const [period,setPeriod]=useState('all');
   const [weekFrom,setWeekFrom]=useState('all');
   const [weekTo,setWeekTo]=useState('all');
+  const [brandMenuOpen,setBrandMenuOpen]=useState(false);
+  const brandMenuRef=useRef(null);
   const [metric,setMetric]=useState('rev');
   const [weekly,setWeekly]=useState(null);
   const [totals,setTotals]=useState(null);
@@ -961,6 +967,15 @@ function Dashboard({user,onLogout,onAdminClick}){
 
   const allSelected=sel.size===BRANDS.length;
   const toggleAll=()=>setSel(allSelected?new Set():new Set(BRANDS));
+
+  useEffect(()=>{
+    if(!brandMenuOpen) return;
+    const onDocMouseDown=e=>{
+      if(brandMenuRef.current && !brandMenuRef.current.contains(e.target)) setBrandMenuOpen(false);
+    };
+    document.addEventListener('mousedown',onDocMouseDown);
+    return ()=>document.removeEventListener('mousedown',onDocMouseDown);
+  },[brandMenuOpen]);
 
   const availableYears=useMemo(()=>{
     if(!weekly) return [];
@@ -1273,18 +1288,28 @@ function Dashboard({user,onLogout,onAdminClick}){
             </select>
           </div>
         </div>
-        <div className="filter-group">
-          <div className="filter-label">브랜드 선택 (클릭으로 토글)</div>
-          <div className="brand-pills">
-            <div className="select-all-pill" onClick={toggleAll}>{allSelected?'전체해제':'전체선택'}</div>
-            {BRANDS.map((b,i)=>(
-              <div key={b}
-                className={`brand-pill ${sel.has(b)?'active':''}`}
-                style={{borderColor:COLORS[i],color:COLORS[i],background:sel.has(b)?COLORS[i]+'22':'transparent'}}
-                onClick={()=>toggle(b)}
-              >{b}</div>
-            ))}
-          </div>
+        <div className="filter-group" style={{position:'relative'}} ref={brandMenuRef}>
+          <div className="filter-label">브랜드 선택</div>
+          <button type="button" className="brand-dropdown-trigger" onClick={()=>setBrandMenuOpen(o=>!o)}>
+            <span>{allSelected?`전체 (${BRANDS.length})`:sel.size===0?'선택 없음':`${sel.size}개 브랜드 선택됨`}</span>
+            <span className="brand-dropdown-caret">{brandMenuOpen?'▲':'▼'}</span>
+          </button>
+          {brandMenuOpen && (
+            <div className="brand-dropdown-panel">
+              <label className="brand-dropdown-item">
+                <input type="checkbox" checked={allSelected} onChange={toggleAll}/>
+                <span>{allSelected?'전체 해제':'전체 선택'}</span>
+              </label>
+              <div className="brand-dropdown-divider"/>
+              {BRANDS.map((b,i)=>(
+                <label key={b} className="brand-dropdown-item">
+                  <input type="checkbox" checked={sel.has(b)} onChange={()=>toggle(b)}/>
+                  <span className="brand-dropdown-dot" style={{background:COLORS[i]}}/>
+                  <span>{b}</span>
+                </label>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
