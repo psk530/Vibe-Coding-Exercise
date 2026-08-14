@@ -680,8 +680,7 @@ function AdminScreen({onBack,onLogout}){
     setEditForm({name:u.name,email:u.email,role:u.role,password:'',status:u.status});
   };
 
-  const saveEdit=(e)=>{
-    e.preventDefault();
+  const saveEdit=()=>{
     setError('');
     const {password,...rest}=editForm;
     const payload=password?{...rest,password}:rest;
@@ -749,22 +748,26 @@ function AdminScreen({onBack,onLogout}){
               {(users||[]).map(u=>(
                 editingUser===u.id ? (
                   <tr key={u.id}>
-                    <td colSpan={8}>
-                      <form onSubmit={saveEdit} style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',padding:'6px 0'}}>
-                        <input style={{width:100,padding:'5px 8px',border:'1px solid var(--c-gray-light)',borderRadius:6,fontSize:12}} value={editForm.name} onChange={e=>setEditForm({...editForm,name:e.target.value})}/>
-                        <input style={{width:180,padding:'5px 8px',border:'1px solid var(--c-gray-light)',borderRadius:6,fontSize:12}} value={editForm.email} onChange={e=>setEditForm({...editForm,email:e.target.value})}/>
-                        <input type="password" placeholder="새 비밀번호(변경시에만 입력)" style={{width:160,padding:'5px 8px',border:'1px solid var(--c-gray-light)',borderRadius:6,fontSize:12}} value={editForm.password} onChange={e=>setEditForm({...editForm,password:e.target.value})}/>
-                        <select style={{padding:'5px 8px',border:'1px solid var(--c-gray-light)',borderRadius:6,fontSize:12}} value={editForm.role} onChange={e=>setEditForm({...editForm,role:e.target.value})}>
-                          <option value="user">사용자</option>
-                          <option value="admin">관리자</option>
-                        </select>
-                        <select style={{padding:'5px 8px',border:'1px solid var(--c-gray-light)',borderRadius:6,fontSize:12}} value={editForm.status} onChange={e=>setEditForm({...editForm,status:e.target.value})}>
-                          <option value="active">YES</option>
-                          <option value="inactive">NO</option>
-                        </select>
-                        <button className="bo-btn" type="submit">저장</button>
-                        <button className="bo-btn" type="button" onClick={()=>setEditingUser(null)}>취소</button>
-                      </form>
+                    <td><input style={{width:'100%',padding:'5px 8px',border:'1px solid var(--c-gray-light)',borderRadius:6,fontSize:12}} value={editForm.name} onChange={e=>setEditForm({...editForm,name:e.target.value})}/></td>
+                    <td><input style={{width:'100%',padding:'5px 8px',border:'1px solid var(--c-gray-light)',borderRadius:6,fontSize:12}} value={editForm.email} onChange={e=>setEditForm({...editForm,email:e.target.value})}/></td>
+                    <td><input type="password" placeholder="새 비밀번호(변경시에만)" style={{width:'100%',padding:'5px 8px',border:'1px solid var(--c-gray-light)',borderRadius:6,fontSize:12}} value={editForm.password} onChange={e=>setEditForm({...editForm,password:e.target.value})}/></td>
+                    <td>
+                      <select style={{width:'100%',padding:'5px 8px',border:'1px solid var(--c-gray-light)',borderRadius:6,fontSize:12}} value={editForm.status} onChange={e=>setEditForm({...editForm,status:e.target.value})}>
+                        <option value="active">YES</option>
+                        <option value="inactive">NO</option>
+                      </select>
+                    </td>
+                    <td>
+                      <select style={{width:'100%',padding:'5px 8px',border:'1px solid var(--c-gray-light)',borderRadius:6,fontSize:12}} value={editForm.role} onChange={e=>setEditForm({...editForm,role:e.target.value})}>
+                        <option value="user">사용자</option>
+                        <option value="admin">관리자</option>
+                      </select>
+                    </td>
+                    <td style={{color:'var(--c-gray-dark)'}}>{fmtDateTime(u.created_at)}</td>
+                    <td style={{color:'var(--c-gray-dark)'}}>{fmtDateTime(u.status_changed_at)}</td>
+                    <td style={{whiteSpace:'nowrap'}}>
+                      <button className="bo-btn" type="button" onClick={saveEdit}>저장</button>
+                      <button className="bo-btn" type="button" onClick={()=>setEditingUser(null)}>취소</button>
                     </td>
                   </tr>
                 ) : (
