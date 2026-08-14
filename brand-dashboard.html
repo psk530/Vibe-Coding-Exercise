@@ -1242,19 +1242,19 @@ function Dashboard({user,onLogout,onAdminClick}){
           </select>
         </div>
         <div className="filter-group">
-          <div className="filter-label">주차 선택 (From)</div>
-          <select className="filter-select" value={weekFrom} onChange={e=>onWeekFromChange(e.target.value)} disabled={period==='all'}>
-            <option value="all">전체</option>
-            {availableWeeks.map(w=><option key={w} value={w}>{w}주차</option>)}
-          </select>
-        </div>
-        <div className="filter-group">
-          <div className="filter-label">주차 선택 (To)</div>
-          <select className="filter-select" value={weekTo} onChange={e=>setWeekTo(e.target.value)} disabled={period==='all'||weekFrom==='all'}>
-            {weekFrom==='all'
-              ?<option value="all">전체</option>
-              :weekToOptions.map(w=><option key={w} value={w}>{w}주차</option>)}
-          </select>
+          <div className="filter-label">주차선택(From~To)</div>
+          <div style={{display:'flex',alignItems:'center',gap:8}}>
+            <select className="filter-select" value={weekFrom} onChange={e=>onWeekFromChange(e.target.value)} disabled={period==='all'}>
+              <option value="all">전체</option>
+              {availableWeeks.map(w=><option key={w} value={w}>{w}주차</option>)}
+            </select>
+            <span style={{color:'var(--c-gray-dark)',fontWeight:600}}>~</span>
+            <select className="filter-select" value={weekTo} onChange={e=>setWeekTo(e.target.value)} disabled={period==='all'||weekFrom==='all'}>
+              {weekFrom==='all'
+                ?<option value="all">전체</option>
+                :weekToOptions.map(w=><option key={w} value={w}>{w}주차</option>)}
+            </select>
+          </div>
         </div>
         <div className="filter-group">
           <div className="filter-label">브랜드 선택 (클릭으로 토글)</div>
