@@ -591,18 +591,24 @@ def totals(user: dict = Depends(get_current_user)):
     return result
 
 
-def period_where(period: str, week: str = "all"):
+def _parse_week(week: str, field_name: str) -> int:
+    if not re.fullmatch(r"\d{1,2}", week):
+        raise HTTPException(400, f"잘못된 {field_name} 값입니다.")
+    return int(week)
+
+
+def period_where(period: str, week_from: str = "all", week_to: str = "all"):
     """Returns (sql_clause, params) filtering sku_weekly.week_id to a year and
-    optionally a specific week within it, or ('', []) for 'all'."""
+    optionally a week range within it, or ('', []) for 'all'."""
     if period == "all":
         return "", []
     if not re.fullmatch(r"\d{4}", period):
         raise HTTPException(400, "잘못된 period 값입니다.")
-    if week == "all":
+    if week_from == "all":
         return "WHERE week_id / 100 = ?", [int(period)]
-    if not re.fullmatch(r"\d{1,2}", week):
-        raise HTTPException(400, "잘못된 week 값입니다.")
-    return "WHERE week_id = ?", [int(period) * 100 + int(week)]
+    wf = _parse_week(week_from, "week_from")
+    wt = _parse_week(week_to, "week_to") if week_to != "all" else wf
+    return "WHERE week_id / 100 = ? AND week_id % 100 BETWEEN ? AND ?", [int(period), wf, wt]
 
 
 OS_LABELS = {"os_-": "기타/미상"}
@@ -617,8 +623,8 @@ TOP_MODELS_SORT_COLUMNS = {
 
 
 @app.get("/api/os_share")
-def os_share(period: str = "all", week: str = "all", user: dict = Depends(get_current_user)):
-    where_clause, params = period_where(period, week)
+def os_share(period: str = "all", week_from: str = "all", week_to: str = "all", user: dict = Depends(get_current_user)):
+    where_clause, params = period_where(period, week_from, week_to)
     conn = get_conn()
     rows = conn.execute(
         f"""
@@ -635,12 +641,12 @@ def os_share(period: str = "all", week: str = "all", user: dict = Depends(get_cu
 
 
 @app.get("/api/top_models")
-def top_models(period: str = "all", week: str = "all", sort: str = "units_sold", limit: int = 15, user: dict = Depends(get_current_user)):
+def top_models(period: str = "all", week_from: str = "all", week_to: str = "all", sort: str = "units_sold", limit: int = 15, user: dict = Depends(get_current_user)):
     sort_col = TOP_MODELS_SORT_COLUMNS.get(sort)
     if sort_col is None:
         raise HTTPException(400, "잘못된 sort 값입니다.")
     limit = max(1, min(limit, 100))
-    where_clause, params = period_where(period, week)
+    where_clause, params = period_where(period, week_from, week_to)
 
     conn = get_conn()
     rows = conn.execute(
