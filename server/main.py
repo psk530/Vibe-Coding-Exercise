@@ -736,17 +736,18 @@ def export_raw_data(period: str = "all", week_from: str = "all", week_to: str = 
     label_font = Font(bold=True, color="FFFFFF")
     thin = Side(style="thin", color="000000")
     medium = Side(style="medium", color="000000")
-    box_border = Border(left=thin, right=thin, top=thin, bottom=thin)
 
+    italic = Font(italic=True)
     summary = [("추출기간", period_label), ("추출일시", datetime.now().strftime("%Y.%m.%d %H:%M")), ("추출건수", len(rows))]
     for r, (label, value) in enumerate(summary, start=1):
         label_cell = ws.cell(row=r, column=1, value=label)
         label_cell.font = label_font
         label_cell.fill = label_fill
-        label_cell.border = box_border
+        label_cell.border = Border(left=None, right=thin, top=thin, bottom=thin)
         label_cell.alignment = Alignment(horizontal="center", vertical="center")
         value_cell = ws.cell(row=r, column=2, value=value)
-        value_cell.border = box_border
+        value_cell.font = italic
+        value_cell.border = Border(left=thin, right=None, top=thin, bottom=thin)
 
     header_row = 5
     header_fill = PatternFill(start_color="C7C7C7", end_color="C7C7C7", fill_type="solid")
@@ -786,7 +787,7 @@ def export_raw_data(period: str = "all", week_from: str = "all", week_to: str = 
     wb.save(buf)
     buf.seek(0)
 
-    filename = f"raw_data_({period_filename_label})_{datetime.now().strftime('%Y%m%d')}.xlsx"
+    filename = f"raw_data_{period_filename_label}_{datetime.now().strftime('%Y%m%d')}.xlsx"
 
     return StreamingResponse(
         buf,
