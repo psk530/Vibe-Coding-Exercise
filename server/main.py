@@ -593,6 +593,20 @@ def totals(user: dict = Depends(get_current_user)):
     return result
 
 
+def _display_width(s: str) -> float:
+    """Approximate rendered width of a string in Excel column-width units.
+    Hangul/CJK characters render roughly twice as wide as Latin/digit
+    characters, so a naive len() undercounts Korean-heavy cells."""
+    width = 0.0
+    for ch in s:
+        code = ord(ch)
+        if 0x1100 <= code <= 0x115F or 0x2E80 <= code <= 0xA4CF or 0xAC00 <= code <= 0xD7A3 or 0xF900 <= code <= 0xFAFF or 0xFF00 <= code <= 0xFF60 or 0xFFE0 <= code <= 0xFFE6:
+            width += 2
+        else:
+            width += 1
+    return width
+
+
 def _parse_week(week: str, field_name: str) -> int:
     if not re.fullmatch(r"\d{1,2}", week):
         raise HTTPException(400, f"잘못된 {field_name} 값입니다.")
@@ -707,10 +721,12 @@ def export_raw_data(period: str = "all", week_from: str = "all", week_to: str = 
 
     if period == "all":
         period_label = "전체"
+        period_filename_label = "전체"
     else:
         from_label = "전체" if week_from == "all" else f"{week_from}주차"
         to_label = "전체" if week_to == "all" else f"{week_to}주차"
         period_label = f"{period}년 {from_label}~{to_label}"
+        period_filename_label = f"{period}년 {from_label}-{to_label}" if week_from != "all" else f"{period}년"
 
     wb = Workbook()
     ws = wb.active
@@ -761,14 +777,16 @@ def export_raw_data(period: str = "all", week_from: str = "all", week_to: str = 
 
     for c in range(1, n_cols + 1):
         values = (ws.cell(row=r, column=c).value for r in range(1, last_row + 1))
-        width = max((len(str(v)) for v in values if v is not None), default=8) + 2
+        width = max((_display_width(str(v)) for v in values if v is not None), default=8) + 3
+        if c == 1:
+            width *= 4 / 3
         ws.column_dimensions[get_column_letter(c)].width = width
 
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
 
-    filename = f"raw_data_{datetime.now().strftime('%Y%m%d')}.xlsx"
+    filename = f"raw_data_({period_filename_label})_{datetime.now().strftime('%Y%m%d')}.xlsx"
 
     return StreamingResponse(
         buf,
