@@ -731,13 +731,14 @@ def export_raw_data(period: str = "all", week_from: str = "all", week_to: str = 
         label_cell.alignment = Alignment(horizontal="center", vertical="center")
         value_cell = ws.cell(row=r, column=2, value=value)
         value_cell.border = box_border
-        if r < 3:
-            ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=3)
-            ws.cell(row=r, column=3).border = box_border
 
     header_row = 5
+    header_fill = PatternFill(start_color="C7C7C7", end_color="C7C7C7", fill_type="solid")
     for col_idx, h in enumerate(["주차", "브랜드", "매출", "판매수량", "트래픽", "Organic 트래픽"], start=1):
-        ws.cell(row=header_row, column=col_idx, value=h).font = bold
+        cell = ws.cell(row=header_row, column=col_idx, value=h)
+        cell.font = bold
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal="center")
 
     for i, r in enumerate(rows, start=header_row + 1):
         ws.cell(row=i, column=1, value=r["week_id"]).alignment = Alignment(horizontal="center")
@@ -754,8 +755,8 @@ def export_raw_data(period: str = "all", week_from: str = "all", week_to: str = 
             ws.cell(row=r, column=c).border = Border(
                 top=medium if r == header_row else thin,
                 bottom=medium if r in (header_row, last_row) else thin,
-                left=medium if c == 1 else thin,
-                right=medium if c == n_cols else thin,
+                left=None if c == 1 else thin,
+                right=None if c == n_cols else thin,
             )
 
     for c in range(1, n_cols + 1):
