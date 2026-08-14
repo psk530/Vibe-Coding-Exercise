@@ -32,7 +32,8 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from openai import OpenAI
 from openpyxl import Workbook
-from openpyxl.styles import Alignment, Font
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+from openpyxl.utils import get_column_letter
 from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -715,13 +716,24 @@ def export_raw_data(period: str = "all", week_from: str = "all", week_to: str = 
     ws = wb.active
     ws.title = "Raw Data"
     bold = Font(bold=True)
+    label_fill = PatternFill(start_color="595959", end_color="595959", fill_type="solid")
+    label_font = Font(bold=True, color="FFFFFF")
+    thin = Side(style="thin", color="000000")
+    medium = Side(style="medium", color="000000")
+    box_border = Border(left=thin, right=thin, top=thin, bottom=thin)
 
-    ws.cell(row=1, column=1, value="추출기간").font = bold
-    ws.cell(row=1, column=2, value=period_label)
-    ws.cell(row=2, column=1, value="추출일시").font = bold
-    ws.cell(row=2, column=2, value=datetime.now().strftime("%Y.%m.%d %H:%M"))
-    ws.cell(row=3, column=1, value="추출건수").font = bold
-    ws.cell(row=3, column=2, value=len(rows))
+    summary = [("추출기간", period_label), ("추출일시", datetime.now().strftime("%Y.%m.%d %H:%M")), ("추출건수", len(rows))]
+    for r, (label, value) in enumerate(summary, start=1):
+        label_cell = ws.cell(row=r, column=1, value=label)
+        label_cell.font = label_font
+        label_cell.fill = label_fill
+        label_cell.border = box_border
+        label_cell.alignment = Alignment(horizontal="center", vertical="center")
+        value_cell = ws.cell(row=r, column=2, value=value)
+        value_cell.border = box_border
+        if r < 3:
+            ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=3)
+            ws.cell(row=r, column=3).border = box_border
 
     header_row = 5
     for col_idx, h in enumerate(["주차", "브랜드", "매출", "판매수량", "트래픽", "Organic 트래픽"], start=1):
@@ -735,9 +747,21 @@ def export_raw_data(period: str = "all", week_from: str = "all", week_to: str = 
             cell.alignment = Alignment(horizontal="right")
             cell.number_format = "#,##0"
 
-    for col in ws.columns:
-        width = max((len(str(c.value)) for c in col if c.value is not None), default=8) + 2
-        ws.column_dimensions[col[0].column_letter].width = width
+    last_row = header_row + len(rows)
+    n_cols = 6
+    for r in range(header_row, last_row + 1):
+        for c in range(1, n_cols + 1):
+            ws.cell(row=r, column=c).border = Border(
+                top=medium if r == header_row else thin,
+                bottom=medium if r in (header_row, last_row) else thin,
+                left=medium if c == 1 else thin,
+                right=medium if c == n_cols else thin,
+            )
+
+    for c in range(1, n_cols + 1):
+        values = (ws.cell(row=r, column=c).value for r in range(1, last_row + 1))
+        width = max((len(str(v)) for v in values if v is not None), default=8) + 2
+        ws.column_dimensions[get_column_letter(c)].width = width
 
     buf = io.BytesIO()
     wb.save(buf)
