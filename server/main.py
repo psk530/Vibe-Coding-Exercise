@@ -719,14 +719,11 @@ def export_raw_data(period: str = "all", week_from: str = "all", week_to: str = 
     ).fetchall()
     conn.close()
 
-    if period == "all":
-        period_label = "전체"
-        period_filename_label = "전체"
-    else:
-        from_label = "전체" if week_from == "all" else f"{week_from}주차"
-        to_label = "전체" if week_to == "all" else f"{week_to}주차"
-        period_label = f"{period}년 {from_label}~{to_label}"
-        period_filename_label = f"{period}년 {from_label}-{to_label}" if week_from != "all" else f"{period}년"
+    year_label = "전체" if period == "all" else f"{period}년"
+    from_label = "전체" if week_from == "all" else f"{week_from}주차"
+    to_label = "전체" if week_to == "all" else f"{week_to}주차"
+    period_label = "전체" if period == "all" else f"{year_label} {from_label}~{to_label}"
+    period_filename_label = f"{year_label} {from_label}-{to_label}"
 
     wb = Workbook()
     ws = wb.active
