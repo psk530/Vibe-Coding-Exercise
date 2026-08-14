@@ -1268,7 +1268,7 @@ function Dashboard({user,onLogout,onAdminClick}){
           <div className="kpi-label"><span className="num-badge">3</span>매출 1위 브랜드</div>
           <div className="kpi-row" style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,marginTop:2}}>
             <div>
-              <div className="kpi-value" style={{color:topBrand?COLORS[BRANDS.indexOf(topBrand.brand)]:'var(--c-brown)'}}>{topBrand?topBrand.brand:'–'}</div>
+              <div className="kpi-value" style={{color:'#000'}}>{topBrand?topBrand.brand:'–'}</div>
               <div className="kpi-sub">{topBrand?fmtM(topBrand.rev):'–'}</div>
             </div>
             {secondBrand && (
