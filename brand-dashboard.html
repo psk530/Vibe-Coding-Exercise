@@ -92,6 +92,8 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
 .filter-label{font-size:11px;color:var(--c-olive);text-transform:uppercase;letter-spacing:0.5px;font-weight:600}
 .filter-select{background:#fff;border:1px solid var(--c-gray-light);color:var(--c-brown);border-radius:8px;padding:6px 12px;font-size:13px;cursor:pointer;outline:none}
 .filter-select:focus{border-color:var(--c-red)}
+.query-btn{background:var(--c-red);color:#fff;border:none;border-radius:8px;padding:0 22px;height:34px;font-size:13px;font-weight:700;cursor:pointer;flex-shrink:0}
+.query-btn:hover{opacity:.9}
 .brand-dropdown-trigger{background:#fff;border:1px solid var(--c-gray-light);color:var(--c-brown);border-radius:8px;padding:6px 12px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:10px;min-width:170px;justify-content:space-between;font-family:inherit}
 .brand-dropdown-trigger:hover{border-color:var(--c-olive)}
 .brand-dropdown-caret{font-size:10px;color:var(--c-gray-dark);flex-shrink:0}
@@ -899,6 +901,10 @@ function Dashboard({user,onLogout,onAdminClick}){
   const [period,setPeriod]=useState('all');
   const [weekFrom,setWeekFrom]=useState('all');
   const [weekTo,setWeekTo]=useState('all');
+  const [draftSel,setDraftSel]=useState(new Set(BRANDS));
+  const [draftPeriod,setDraftPeriod]=useState('all');
+  const [draftWeekFrom,setDraftWeekFrom]=useState('all');
+  const [draftWeekTo,setDraftWeekTo]=useState('all');
   const [brandMenuOpen,setBrandMenuOpen]=useState(false);
   const brandMenuRef=useRef(null);
   const [metric,setMetric]=useState('rev');
@@ -959,14 +965,14 @@ function Dashboard({user,onLogout,onAdminClick}){
       .catch(e=>setLoadError(e.message));
   },[]);
 
-  const toggle=b=>setSel(prev=>{
+  const toggle=b=>setDraftSel(prev=>{
     const n=new Set(prev);
     if(n.has(b)){if(n.size>1)n.delete(b);}else n.add(b);
     return n;
   });
 
-  const allSelected=sel.size===BRANDS.length;
-  const toggleAll=()=>setSel(allSelected?new Set():new Set(BRANDS));
+  const allSelected=draftSel.size===BRANDS.length;
+  const toggleAll=()=>setDraftSel(allSelected?new Set():new Set(BRANDS));
 
   useEffect(()=>{
     if(!brandMenuOpen) return;
@@ -983,24 +989,31 @@ function Dashboard({user,onLogout,onAdminClick}){
   },[weekly]);
 
   const availableWeeks=useMemo(()=>{
-    if(!weekly||period==='all') return [];
-    const yr=parseInt(period);
+    if(!weekly||draftPeriod==='all') return [];
+    const yr=parseInt(draftPeriod);
     return [...new Set(weekly.filter(r=>Math.floor(r.week/100)===yr).map(r=>r.week%100))].sort((a,b)=>a-b);
-  },[weekly,period]);
+  },[weekly,draftPeriod]);
 
   const onYearChange=y=>{
-    setPeriod(y);
-    setWeekFrom('all');
-    setWeekTo('all');
+    setDraftPeriod(y);
+    setDraftWeekFrom('all');
+    setDraftWeekTo('all');
   };
 
   const onWeekFromChange=v=>{
-    setWeekFrom(v);
+    setDraftWeekFrom(v);
     if(v==='all'){
-      setWeekTo('all');
+      setDraftWeekTo('all');
     }else{
-      setWeekTo(prev=>(prev==='all'||parseInt(prev)<parseInt(v))?v:prev);
+      setDraftWeekTo(prev=>(prev==='all'||parseInt(prev)<parseInt(v))?v:prev);
     }
+  };
+
+  const applyFilters=()=>{
+    setPeriod(draftPeriod);
+    setWeekFrom(draftWeekFrom);
+    setWeekTo(draftWeekTo);
+    setSel(new Set(draftSel));
   };
 
   const handleExport=()=>{
@@ -1009,9 +1022,9 @@ function Dashboard({user,onLogout,onAdminClick}){
   };
 
   const weekToOptions=useMemo(()=>{
-    if(weekFrom==='all') return [];
-    return availableWeeks.filter(w=>w>=parseInt(weekFrom));
-  },[availableWeeks,weekFrom]);
+    if(draftWeekFrom==='all') return [];
+    return availableWeeks.filter(w=>w>=parseInt(draftWeekFrom));
+  },[availableWeeks,draftWeekFrom]);
 
   const filteredTotals=useMemo(()=>{
     if(!weekly||!totals) return [];
@@ -1265,10 +1278,10 @@ function Dashboard({user,onLogout,onAdminClick}){
         </div>
       </div>
 
-      <div className="filters">
+      <form className="filters" onSubmit={e=>{e.preventDefault();applyFilters();}}>
         <div className="filter-group">
           <div className="filter-label">연도 선택</div>
-          <select className="filter-select" value={period} onChange={e=>onYearChange(e.target.value)}>
+          <select className="filter-select" value={draftPeriod} onChange={e=>onYearChange(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();applyFilters();}}}>
             <option value="all">전체</option>
             {availableYears.map(y=><option key={y} value={y}>{y}년</option>)}
           </select>
@@ -1276,13 +1289,13 @@ function Dashboard({user,onLogout,onAdminClick}){
         <div className="filter-group">
           <div className="filter-label">주차선택(From~To)</div>
           <div style={{display:'flex',alignItems:'center',gap:8}}>
-            <select className="filter-select" value={weekFrom} onChange={e=>onWeekFromChange(e.target.value)} disabled={period==='all'}>
+            <select className="filter-select" value={draftWeekFrom} onChange={e=>onWeekFromChange(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();applyFilters();}}} disabled={draftPeriod==='all'}>
               <option value="all">전체</option>
               {availableWeeks.map(w=><option key={w} value={w}>{w}주차</option>)}
             </select>
             <span style={{color:'var(--c-gray-dark)',fontWeight:600}}>~</span>
-            <select className="filter-select" value={weekTo} onChange={e=>setWeekTo(e.target.value)} disabled={period==='all'||weekFrom==='all'}>
-              {weekFrom==='all'
+            <select className="filter-select" value={draftWeekTo} onChange={e=>setDraftWeekTo(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();applyFilters();}}} disabled={draftPeriod==='all'||draftWeekFrom==='all'}>
+              {draftWeekFrom==='all'
                 ?<option value="all">전체</option>
                 :weekToOptions.map(w=><option key={w} value={w}>{w}주차</option>)}
             </select>
@@ -1290,12 +1303,12 @@ function Dashboard({user,onLogout,onAdminClick}){
         </div>
         <div className="filter-group" style={{position:'relative'}} ref={brandMenuRef}>
           <div className="filter-label">브랜드 선택</div>
-          <button type="button" className="brand-dropdown-trigger" onClick={()=>setBrandMenuOpen(o=>!o)}>
-            <span>{allSelected?`전체 (${BRANDS.length})`:sel.size===0?'선택 없음':`${sel.size}개 브랜드 선택됨`}</span>
+          <button type="button" className="brand-dropdown-trigger" onClick={()=>setBrandMenuOpen(o=>!o)} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();applyFilters();}}}>
+            <span>{allSelected?`전체 (${BRANDS.length})`:draftSel.size===0?'선택 없음':`${draftSel.size}개 브랜드 선택됨`}</span>
             <span className="brand-dropdown-caret">{brandMenuOpen?'▲':'▼'}</span>
           </button>
           {brandMenuOpen && (
-            <div className="brand-dropdown-panel">
+            <div className="brand-dropdown-panel" onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();applyFilters();}}}>
               <label className="brand-dropdown-item">
                 <input type="checkbox" checked={allSelected} onChange={toggleAll}/>
                 <span>{allSelected?'전체 해제':'전체 선택'}</span>
@@ -1303,7 +1316,7 @@ function Dashboard({user,onLogout,onAdminClick}){
               <div className="brand-dropdown-divider"/>
               {BRANDS.map((b,i)=>(
                 <label key={b} className="brand-dropdown-item">
-                  <input type="checkbox" checked={sel.has(b)} onChange={()=>toggle(b)}/>
+                  <input type="checkbox" checked={draftSel.has(b)} onChange={()=>toggle(b)}/>
                   <span className="brand-dropdown-dot" style={{background:COLORS[i]}}/>
                   <span>{b}</span>
                 </label>
@@ -1311,7 +1324,8 @@ function Dashboard({user,onLogout,onAdminClick}){
             </div>
           )}
         </div>
-      </div>
+        <button type="submit" className="query-btn">조회</button>
+      </form>
 
       {insights && (
         <div className="chart-card" style={{marginBottom:16}}>
