@@ -743,14 +743,7 @@ def export_raw_data(period: str = "all", week_from: str = "all", week_to: str = 
     wb.save(buf)
     buf.seek(0)
 
-    if period == "all":
-        filename = "raw_data_전체.xlsx"
-    elif week_from == "all":
-        filename = f"raw_data_{period}.xlsx"
-    elif week_to == "all" or week_to == week_from:
-        filename = f"raw_data_{period}_{week_from}주차.xlsx"
-    else:
-        filename = f"raw_data_{period}_{week_from}-{week_to}주차.xlsx"
+    filename = f"raw_data_{datetime.now().strftime('%Y%m%d')}.xlsx"
 
     return StreamingResponse(
         buf,
