@@ -1059,6 +1059,33 @@ function Dashboard({user,onLogout,onAdminClick}){
     };
   },[weekly,sel,period]);
 
+  const mom=useMemo(()=>{
+    if(!weekly) return null;
+    const monthMap={};
+    for(const r of weekly){
+      const yr=Math.floor(r.week/100);
+      if(period!=='all'&&yr!==parseInt(period)) continue;
+      if(!sel.has(r.brand)) continue;
+      const wk=r.week%100;
+      const mo=Math.min(Math.ceil(wk/4.33),12);
+      const key=yr*100+mo;
+      if(!monthMap[key]) monthMap[key]={rev:0,units:0,traffic:0};
+      monthMap[key].rev+=r.rev;
+      monthMap[key].units+=r.units;
+      monthMap[key].traffic+=r.traffic;
+    }
+    const keys=Object.keys(monthMap).map(Number).sort((a,b)=>a-b);
+    if(keys.length<2) return null;
+    const cur=monthMap[keys[keys.length-1]], prior=monthMap[keys[keys.length-2]];
+    const convCur=cur.traffic?cur.units/cur.traffic*100:0;
+    const convPrior=prior.traffic?prior.units/prior.traffic*100:0;
+    return {
+      revPct:prior.rev?(cur.rev-prior.rev)/prior.rev*100:null,
+      unitsPct:prior.units?(cur.units-prior.units)/prior.units*100:null,
+      convDelta:convCur-convPrior,
+    };
+  },[weekly,sel,period]);
+
   const convBarData=useMemo(()=>{
     return [...filteredTotals]
       .sort((a,b)=>b.conv-a.conv)
@@ -1241,12 +1268,20 @@ function Dashboard({user,onLogout,onAdminClick}){
               <div className="kpi-value">{fmtM(totalRev)}</div>
               <div className="kpi-sub">{period==='all'?'전체 기간 합산 USD':`${period}년 합산 USD`}</div>
             </div>
-            {yoy&&yoy.revPct!=null && (
-              <div style={{textAlign:'center',flexShrink:0,borderLeft:'1px solid var(--c-khaki)',padding:'0 14px'}}>
-                <div style={{fontSize:10,color:'var(--c-olive)',whiteSpace:'nowrap'}}>YoY</div>
-                <div style={{fontSize:12,fontWeight:700,whiteSpace:'nowrap',color:yoy.revPct>=0?'#1a7f37':'#c0392b'}}>{yoy.revPct>=0?'+':''}{yoy.revPct.toFixed(1)}%</div>
-              </div>
-            )}
+            <div style={{display:'flex',flexShrink:0}}>
+              {mom&&mom.revPct!=null && (
+                <div style={{textAlign:'center',flexShrink:0,borderLeft:'1px solid var(--c-khaki)',padding:'0 14px'}}>
+                  <div style={{fontSize:10,color:'var(--c-olive)',whiteSpace:'nowrap'}}>MoM</div>
+                  <div style={{fontSize:12,fontWeight:700,whiteSpace:'nowrap',color:mom.revPct>=0?'#1a7f37':'#c0392b'}}>{mom.revPct>=0?'+':''}{mom.revPct.toFixed(1)}%</div>
+                </div>
+              )}
+              {yoy&&yoy.revPct!=null && (
+                <div style={{textAlign:'center',flexShrink:0,borderLeft:'1px solid var(--c-khaki)',padding:'0 14px'}}>
+                  <div style={{fontSize:10,color:'var(--c-olive)',whiteSpace:'nowrap'}}>YoY</div>
+                  <div style={{fontSize:12,fontWeight:700,whiteSpace:'nowrap',color:yoy.revPct>=0?'#1a7f37':'#c0392b'}}>{yoy.revPct>=0?'+':''}{yoy.revPct.toFixed(1)}%</div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
         <div className="kpi-card">
@@ -1256,12 +1291,20 @@ function Dashboard({user,onLogout,onAdminClick}){
               <div className="kpi-value">{fmtK(totalUnits)}</div>
               <div className="kpi-sub">Units Sold</div>
             </div>
-            {yoy&&yoy.unitsPct!=null && (
-              <div style={{textAlign:'center',flexShrink:0,borderLeft:'1px solid var(--c-khaki)',padding:'0 14px'}}>
-                <div style={{fontSize:10,color:'var(--c-olive)',whiteSpace:'nowrap'}}>YoY</div>
-                <div style={{fontSize:12,fontWeight:700,whiteSpace:'nowrap',color:yoy.unitsPct>=0?'#1a7f37':'#c0392b'}}>{yoy.unitsPct>=0?'+':''}{yoy.unitsPct.toFixed(1)}%</div>
-              </div>
-            )}
+            <div style={{display:'flex',flexShrink:0}}>
+              {mom&&mom.unitsPct!=null && (
+                <div style={{textAlign:'center',flexShrink:0,borderLeft:'1px solid var(--c-khaki)',padding:'0 14px'}}>
+                  <div style={{fontSize:10,color:'var(--c-olive)',whiteSpace:'nowrap'}}>MoM</div>
+                  <div style={{fontSize:12,fontWeight:700,whiteSpace:'nowrap',color:mom.unitsPct>=0?'#1a7f37':'#c0392b'}}>{mom.unitsPct>=0?'+':''}{mom.unitsPct.toFixed(1)}%</div>
+                </div>
+              )}
+              {yoy&&yoy.unitsPct!=null && (
+                <div style={{textAlign:'center',flexShrink:0,borderLeft:'1px solid var(--c-khaki)',padding:'0 14px'}}>
+                  <div style={{fontSize:10,color:'var(--c-olive)',whiteSpace:'nowrap'}}>YoY</div>
+                  <div style={{fontSize:12,fontWeight:700,whiteSpace:'nowrap',color:yoy.unitsPct>=0?'#1a7f37':'#c0392b'}}>{yoy.unitsPct>=0?'+':''}{yoy.unitsPct.toFixed(1)}%</div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
         <div className="kpi-card">
@@ -1292,12 +1335,20 @@ function Dashboard({user,onLogout,onAdminClick}){
               <div className="kpi-value">{fmtPct(avgConv)}</div>
               <div className="kpi-sub">선택 브랜드 평균</div>
             </div>
-            {yoy && (
-              <div style={{textAlign:'center',flexShrink:0,borderLeft:'1px solid var(--c-khaki)',padding:'0 14px'}}>
-                <div style={{fontSize:10,color:'var(--c-olive)',whiteSpace:'nowrap'}}>YoY</div>
-                <div style={{fontSize:12,fontWeight:700,whiteSpace:'nowrap',color:yoy.convDelta>=0?'#1a7f37':'#c0392b'}}>{yoy.convDelta>=0?'+':''}{yoy.convDelta.toFixed(1)}%p</div>
-              </div>
-            )}
+            <div style={{display:'flex',flexShrink:0}}>
+              {mom && (
+                <div style={{textAlign:'center',flexShrink:0,borderLeft:'1px solid var(--c-khaki)',padding:'0 14px'}}>
+                  <div style={{fontSize:10,color:'var(--c-olive)',whiteSpace:'nowrap'}}>MoM</div>
+                  <div style={{fontSize:12,fontWeight:700,whiteSpace:'nowrap',color:mom.convDelta>=0?'#1a7f37':'#c0392b'}}>{mom.convDelta>=0?'+':''}{mom.convDelta.toFixed(1)}%p</div>
+                </div>
+              )}
+              {yoy && (
+                <div style={{textAlign:'center',flexShrink:0,borderLeft:'1px solid var(--c-khaki)',padding:'0 14px'}}>
+                  <div style={{fontSize:10,color:'var(--c-olive)',whiteSpace:'nowrap'}}>YoY</div>
+                  <div style={{fontSize:12,fontWeight:700,whiteSpace:'nowrap',color:yoy.convDelta>=0?'#1a7f37':'#c0392b'}}>{yoy.convDelta>=0?'+':''}{yoy.convDelta.toFixed(1)}%p</div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
