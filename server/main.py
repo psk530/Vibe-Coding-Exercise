@@ -787,7 +787,7 @@ def export_raw_data(period: str = "all", week_from: str = "all", week_to: str = 
     wb.save(buf)
     buf.seek(0)
 
-    filename = f"raw_data_{period_filename_label}_{datetime.now().strftime('%Y%m%d')}.xlsx"
+    filename = f"Raw Data_{period_filename_label}_{datetime.now().strftime('%Y%m%d %H%M')}.xlsx"
 
     return StreamingResponse(
         buf,
