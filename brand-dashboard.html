@@ -248,12 +248,19 @@ function weekToLabel(w){
   return `${String(yr).slice(2)}-${ms[mo-1]}`;
 }
 
-function buildTrendData(weekly, selectedBrands, period){
+function fmtPeriodLabel(period,week){
+  if(period==='all') return '전체 기간';
+  if(week==='all') return `${period}년`;
+  return `${period}년 ${week}주차`;
+}
+
+function buildTrendData(weekly, selectedBrands, period, week){
   const map={};
   for(const row of weekly){
     const {week:wk,brand:b,rev,units,traffic,organic}=row;
     const yr=Math.floor(wk/100);
     if(period!=='all' && yr!==parseInt(period)) continue;
+    if(period!=='all' && week!=='all' && wk%100!==parseInt(week)) continue;
     if(!selectedBrands.includes(b)) continue;
     const key=weekToLabel(wk);
     if(!map[key]) map[key]={label:key,_wk:wk};
@@ -868,6 +875,7 @@ function App(){
 function Dashboard({user,onLogout,onAdminClick}){
   const [sel,setSel]=useState(new Set(BRANDS));
   const [period,setPeriod]=useState('all');
+  const [week,setWeek]=useState('all');
   const [metric,setMetric]=useState('rev');
   const [weekly,setWeekly]=useState(null);
   const [totals,setTotals]=useState(null);
@@ -881,12 +889,12 @@ function Dashboard({user,onLogout,onAdminClick}){
   const draggingRef=useRef(false);
 
   useEffect(()=>{
-    fetch(`/api/os_share?period=${period}`).then(r=>r.json()).then(setOsShare).catch(()=>setOsShare([]));
-  },[period]);
+    fetch(`/api/os_share?period=${period}&week=${week}`).then(r=>r.json()).then(setOsShare).catch(()=>setOsShare([]));
+  },[period,week]);
 
   useEffect(()=>{
-    fetch(`/api/top_models?period=${period}&sort=${modelSort}`).then(r=>r.json()).then(setTopModels).catch(()=>setTopModels([]));
-  },[period,modelSort]);
+    fetch(`/api/top_models?period=${period}&week=${week}&sort=${modelSort}`).then(r=>r.json()).then(setTopModels).catch(()=>setTopModels([]));
+  },[period,week,modelSort]);
 
   const osPieData=useMemo(()=>{
     if(!osShare) return [];
@@ -935,6 +943,22 @@ function Dashboard({user,onLogout,onAdminClick}){
   const allSelected=sel.size===BRANDS.length;
   const toggleAll=()=>setSel(allSelected?new Set():new Set(BRANDS));
 
+  const availableYears=useMemo(()=>{
+    if(!weekly) return [];
+    return [...new Set(weekly.map(r=>Math.floor(r.week/100)))].sort();
+  },[weekly]);
+
+  const availableWeeks=useMemo(()=>{
+    if(!weekly||period==='all') return [];
+    const yr=parseInt(period);
+    return [...new Set(weekly.filter(r=>Math.floor(r.week/100)===yr).map(r=>r.week%100))].sort((a,b)=>a-b);
+  },[weekly,period]);
+
+  const onYearChange=y=>{
+    setPeriod(y);
+    setWeek('all');
+  };
+
   const filteredTotals=useMemo(()=>{
     if(!weekly||!totals) return [];
     if(period==='all') return totals.filter(t=>sel.has(t.brand));
@@ -943,6 +967,7 @@ function Dashboard({user,onLogout,onAdminClick}){
       const {week:wk,brand:b,rev,units,traffic,organic}=row;
       const yr=Math.floor(wk/100);
       if(yr!==parseInt(period)) continue;
+      if(week!=='all'&&wk%100!==parseInt(week)) continue;
       if(!sel.has(b)) continue;
       if(!byBrand[b]) byBrand[b]={brand:b,rev:0,units:0,traffic:0,organic:0,conv:0};
       byBrand[b].rev+=rev;
@@ -951,7 +976,7 @@ function Dashboard({user,onLogout,onAdminClick}){
       byBrand[b].organic+=(organic||0);
     }
     return Object.values(byBrand).map(t=>({...t,conv:t.traffic?t.units/t.traffic*100:0}));
-  },[weekly,totals,sel,period]);
+  },[weekly,totals,sel,period,week]);
 
   const totalRev=filteredTotals.reduce((s,t)=>s+t.rev,0);
   const totalUnits=filteredTotals.reduce((s,t)=>s+t.units,0);
@@ -968,7 +993,7 @@ function Dashboard({user,onLogout,onAdminClick}){
       .map(t=>({brand:t.brand,value:t[metric==='rev'?'rev':'units'],color:COLORS[BRANDS.indexOf(t.brand)]}));
   },[filteredTotals,metric]);
 
-  const trendData=useMemo(()=>weekly?buildTrendData(weekly,[...sel],period):[],[weekly,sel,period]);
+  const trendData=useMemo(()=>weekly?buildTrendData(weekly,[...sel],period,week):[],[weekly,sel,period,week]);
   const selLegendData=useMemo(()=>[...sel].map(b=>({brand:b,color:COLORS[BRANDS.indexOf(b)]})),[sel]);
 
   const trendPeak=useMemo(()=>{
@@ -1038,7 +1063,9 @@ function Dashboard({user,onLogout,onAdminClick}){
     const curYear=period==='all'?maxYear:parseInt(period);
     const priorYear=curYear-1;
     if(!years.includes(priorYear)) return null;
-    const curWeekNos=new Set(weekly.filter(r=>Math.floor(r.week/100)===curYear).map(r=>r.week%100));
+    const curWeekNos=period!=='all'&&week!=='all'
+      ?new Set([parseInt(week)])
+      :new Set(weekly.filter(r=>Math.floor(r.week/100)===curYear).map(r=>r.week%100));
     const sums=yr=>{
       let rev=0,units=0,traffic=0;
       for(const r of weekly){
@@ -1057,7 +1084,7 @@ function Dashboard({user,onLogout,onAdminClick}){
       unitsPct:prior.units?(cur.units-prior.units)/prior.units*100:null,
       convDelta:cur.conv-prior.conv,
     };
-  },[weekly,sel,period]);
+  },[weekly,sel,period,week]);
 
   const mom=useMemo(()=>{
     if(!weekly) return null;
@@ -1065,6 +1092,7 @@ function Dashboard({user,onLogout,onAdminClick}){
     for(const r of weekly){
       const yr=Math.floor(r.week/100);
       if(period!=='all'&&yr!==parseInt(period)) continue;
+      if(period!=='all'&&week!=='all'&&r.week%100!==parseInt(week)) continue;
       if(!sel.has(r.brand)) continue;
       const wk=r.week%100;
       const mo=Math.min(Math.ceil(wk/4.33),12);
@@ -1084,7 +1112,7 @@ function Dashboard({user,onLogout,onAdminClick}){
       unitsPct:prior.units?(cur.units-prior.units)/prior.units*100:null,
       convDelta:convCur-convPrior,
     };
-  },[weekly,sel,period]);
+  },[weekly,sel,period,week]);
 
   const convBarData=useMemo(()=>{
     return [...filteredTotals]
@@ -1130,7 +1158,7 @@ function Dashboard({user,onLogout,onAdminClick}){
     const convTop=byConv[0], convBottom=byConv[byConv.length-1];
     const trafficTop=byTraffic[0];
     const inefficient=byTraffic.filter(t=>t.traffic>=avgTrafficSel&&t.conv<avgConvSel).sort((a,b)=>b.traffic-a.traffic)[0]||null;
-    const periodLabel=period==='all'?'전체 기간(2024–2026)':`${period}년`;
+    const periodLabel=fmtPeriodLabel(period,week);
 
     const revs=filteredTotals.map(t=>t.rev), traffics=filteredTotals.map(t=>t.traffic),
       convs=filteredTotals.map(t=>t.conv), units=filteredTotals.map(t=>t.units),
@@ -1153,7 +1181,7 @@ function Dashboard({user,onLogout,onAdminClick}){
       avgConvSel,avgTrafficSel,convTop,convBottom,trafficTop,inefficient,totalRevSel,
       corrRevTraffic,corrTrafficConv,corrRevConv,corrUnitsTraffic,corrOrganicConv,corrOrganicRev,
       sigRevTraffic,sigTrafficConv,sigRevConv,sigUnitsTraffic,sigOrganicConv,sigOrganicRev};
-  },[filteredTotals,period]);
+  },[filteredTotals,period,week]);
 
   if(loadError){
     return <div style={{padding:40,color:'var(--c-red)'}}>데이터 로딩 실패: {loadError}. API 서버(uvicorn server.main:app)가 실행 중인지 확인하세요.</div>;
@@ -1179,12 +1207,17 @@ function Dashboard({user,onLogout,onAdminClick}){
 
       <div className="filters">
         <div className="filter-group">
-          <div className="filter-label">기간 선택</div>
-          <select className="filter-select" value={period} onChange={e=>setPeriod(e.target.value)}>
-            <option value="all">전체 (2024–2026)</option>
-            <option value="2024">2024년</option>
-            <option value="2025">2025년</option>
-            <option value="2026">2026년 (1~5주)</option>
+          <div className="filter-label">연도 선택</div>
+          <select className="filter-select" value={period} onChange={e=>onYearChange(e.target.value)}>
+            <option value="all">전체</option>
+            {availableYears.map(y=><option key={y} value={y}>{y}년</option>)}
+          </select>
+        </div>
+        <div className="filter-group">
+          <div className="filter-label">주차 선택</div>
+          <select className="filter-select" value={week} onChange={e=>setWeek(e.target.value)} disabled={period==='all'}>
+            <option value="all">전체</option>
+            {availableWeeks.map(w=><option key={w} value={w}>{w}주차</option>)}
           </select>
         </div>
         <div className="filter-group">
@@ -1266,7 +1299,7 @@ function Dashboard({user,onLogout,onAdminClick}){
           <div className="kpi-row" style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,marginTop:2}}>
             <div>
               <div className="kpi-value">{fmtM(totalRev)}</div>
-              <div className="kpi-sub">{period==='all'?'전체 기간 합산 USD':`${period}년 합산 USD`}</div>
+              <div className="kpi-sub">{fmtPeriodLabel(period,week)} 합산 USD</div>
             </div>
             <div style={{display:'flex',flexShrink:0}}>
               {mom&&mom.revPct!=null && (
@@ -1508,7 +1541,7 @@ function Dashboard({user,onLogout,onAdminClick}){
           <div className="chart-header">
             <div>
               <div className="chart-title"><span className="num-badge">9</span>브랜드별 Total Traffic</div>
-              <div className="chart-subtitle">{period==='all'?'전체 기간':`${period}년`} 합산 · 브랜드 노출 규모</div>
+              <div className="chart-subtitle">{fmtPeriodLabel(period,week)} 합산 · 브랜드 노출 규모</div>
             </div>
             {trafficBarData.length>0 && (
               <div className="chart-header-insight" style={{flex:1,marginLeft:20}}>
@@ -1535,7 +1568,7 @@ function Dashboard({user,onLogout,onAdminClick}){
           <div className="chart-header">
             <div>
               <div className="chart-title"><span className="num-badge">10</span>브랜드별 전환율 (Conversion Rate)</div>
-              <div className="chart-subtitle">{period==='all'?'전체 기간':`${period}년`} 평균 · 높을수록 구매 효율 우수</div>
+              <div className="chart-subtitle">{fmtPeriodLabel(period,week)} 평균 · 높을수록 구매 효율 우수</div>
             </div>
             {convBarData.length>0 && (
               <div className="chart-header-insight" style={{flex:1,marginLeft:20}}>
@@ -1565,7 +1598,7 @@ function Dashboard({user,onLogout,onAdminClick}){
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
               <div>
                 <div className="chart-title"><span className="num-badge">11</span>브랜드별 Total Traffic 대비 전환율 분석</div>
-                <div className="chart-subtitle">{period==='all'?'전체 기간':`${period}년`} 기준 · X축 트래픽, Y축 전환율</div>
+                <div className="chart-subtitle">{fmtPeriodLabel(period,week)} 기준 · X축 트래픽, Y축 전환율</div>
               </div>
               {insights && <CorrBadge r={insights.corrTrafficConv}/>}
             </div>
@@ -1598,7 +1631,7 @@ function Dashboard({user,onLogout,onAdminClick}){
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
               <div>
                 <div className="chart-title"><span className="num-badge">12</span>브랜드별 Organic Traffic 대비 전환율 분석</div>
-                <div className="chart-subtitle">{period==='all'?'전체 기간':`${period}년`} 기준 · X축 Organic 트래픽, Y축 전환율</div>
+                <div className="chart-subtitle">{fmtPeriodLabel(period,week)} 기준 · X축 Organic 트래픽, Y축 전환율</div>
               </div>
               {insights && <CorrBadge r={insights.corrOrganicConv}/>}
             </div>
@@ -1632,7 +1665,7 @@ function Dashboard({user,onLogout,onAdminClick}){
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
               <div>
                 <div className="chart-title"><span className="num-badge">13</span>브랜드별 Total Traffic 대비 매출 분석</div>
-                <div className="chart-subtitle">{period==='all'?'전체 기간':`${period}년`} 기준 · X축 트래픽, Y축 매출</div>
+                <div className="chart-subtitle">{fmtPeriodLabel(period,week)} 기준 · X축 트래픽, Y축 매출</div>
               </div>
               {insights && <CorrBadge r={insights.corrRevTraffic}/>}
             </div>
@@ -1664,7 +1697,7 @@ function Dashboard({user,onLogout,onAdminClick}){
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
               <div>
                 <div className="chart-title"><span className="num-badge">14</span>브랜드별 Organic Traffic 대비 매출 분석</div>
-                <div className="chart-subtitle">{period==='all'?'전체 기간':`${period}년`} 기준 · X축 Organic 트래픽, Y축 매출</div>
+                <div className="chart-subtitle">{fmtPeriodLabel(period,week)} 기준 · X축 Organic 트래픽, Y축 매출</div>
               </div>
               {insights && <CorrBadge r={insights.corrOrganicRev}/>}
             </div>
@@ -1698,7 +1731,7 @@ function Dashboard({user,onLogout,onAdminClick}){
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
               <div>
                 <div className="chart-title"><span className="num-badge">15</span>브랜드별 매출 대비 전환율 분석</div>
-                <div className="chart-subtitle">{period==='all'?'전체 기간':`${period}년`} 기준 · X축 매출, Y축 전환율</div>
+                <div className="chart-subtitle">{fmtPeriodLabel(period,week)} 기준 · X축 매출, Y축 전환율</div>
               </div>
               {insights && <CorrBadge r={insights.corrRevConv}/>}
             </div>
@@ -1729,7 +1762,7 @@ function Dashboard({user,onLogout,onAdminClick}){
           <div className="chart-header" style={{flexDirection:'column',alignItems:'stretch'}}>
             <div>
               <div className="chart-title"><span className="num-badge">16</span>OS별 점유율</div>
-              <div className="chart-subtitle">{period==='all'?'전체 기간':`${period}년`} 기준 · 10개 브랜드 판매량(Units Sold) 기준</div>
+              <div className="chart-subtitle">{fmtPeriodLabel(period,week)} 기준 · 10개 브랜드 판매량(Units Sold) 기준</div>
             </div>
             {osPieData.length>0 && (
               <div className="chart-header-insight" style={{marginTop:8,minHeight:36}}>
@@ -1764,7 +1797,7 @@ function Dashboard({user,onLogout,onAdminClick}){
           <div className="chart-header">
             <div>
               <div className="chart-title"><span className="num-badge">17</span>모델별 상세</div>
-              <div className="chart-subtitle">{period==='all'?'전체 기간':`${period}년`} 기준 · {MODEL_TABLE_COLUMNS.find(c=>c.key===modelSort).label} 기준 내림차순 상위 15개 · 컬럼명을 클릭하면 기준이 바뀝니다</div>
+              <div className="chart-subtitle">{fmtPeriodLabel(period,week)} 기준 · {MODEL_TABLE_COLUMNS.find(c=>c.key===modelSort).label} 기준 내림차순 상위 15개 · 컬럼명을 클릭하면 기준이 바뀝니다</div>
             </div>
           </div>
           <div style={{overflowX:'auto'}}>

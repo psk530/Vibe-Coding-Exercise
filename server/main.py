@@ -591,13 +591,18 @@ def totals(user: dict = Depends(get_current_user)):
     return result
 
 
-def period_where(period: str):
-    """Returns (sql_clause, params) filtering sku_weekly.week_id to a year, or ('', []) for 'all'."""
+def period_where(period: str, week: str = "all"):
+    """Returns (sql_clause, params) filtering sku_weekly.week_id to a year and
+    optionally a specific week within it, or ('', []) for 'all'."""
     if period == "all":
         return "", []
     if not re.fullmatch(r"\d{4}", period):
         raise HTTPException(400, "잘못된 period 값입니다.")
-    return "WHERE week_id / 100 = ?", [int(period)]
+    if week == "all":
+        return "WHERE week_id / 100 = ?", [int(period)]
+    if not re.fullmatch(r"\d{1,2}", week):
+        raise HTTPException(400, "잘못된 week 값입니다.")
+    return "WHERE week_id = ?", [int(period) * 100 + int(week)]
 
 
 OS_LABELS = {"os_-": "기타/미상"}
@@ -612,8 +617,8 @@ TOP_MODELS_SORT_COLUMNS = {
 
 
 @app.get("/api/os_share")
-def os_share(period: str = "all", user: dict = Depends(get_current_user)):
-    where_clause, params = period_where(period)
+def os_share(period: str = "all", week: str = "all", user: dict = Depends(get_current_user)):
+    where_clause, params = period_where(period, week)
     conn = get_conn()
     rows = conn.execute(
         f"""
@@ -630,12 +635,12 @@ def os_share(period: str = "all", user: dict = Depends(get_current_user)):
 
 
 @app.get("/api/top_models")
-def top_models(period: str = "all", sort: str = "units_sold", limit: int = 15, user: dict = Depends(get_current_user)):
+def top_models(period: str = "all", week: str = "all", sort: str = "units_sold", limit: int = 15, user: dict = Depends(get_current_user)):
     sort_col = TOP_MODELS_SORT_COLUMNS.get(sort)
     if sort_col is None:
         raise HTTPException(400, "잘못된 sort 값입니다.")
     limit = max(1, min(limit, 100))
-    where_clause, params = period_where(period)
+    where_clause, params = period_where(period, week)
 
     conn = get_conn()
     rows = conn.execute(
