@@ -282,7 +282,7 @@ function buildTrendData(weekly, selectedBrands, period, weekFrom, weekTo){
     if(period!=='all' && !weekInRange(wk%100,weekFrom,weekTo)) continue;
     if(!selectedBrands.includes(b)) continue;
     const key=byWeek?String(wk):weekToLabel(wk);
-    if(!map[key]) map[key]={label:byWeek?`${wk%100}주차`:key,_wk:wk};
+    if(!map[key]) map[key]={label:byWeek?`${String(yr).slice(2)}.${wk%100}주차`:key,_wk:wk};
     map[key][b]=(map[key][b]||0)+rev;
     map[key][b+'_u']=(map[key][b+'_u']||0)+units;
     map[key][b+'_t']=(map[key][b+'_t']||0)+(traffic||0);
@@ -1062,6 +1062,7 @@ function Dashboard({user,onLogout,onAdminClick}){
   },[filteredTotals,metric]);
 
   const trendData=useMemo(()=>weekly?buildTrendData(weekly,[...sel],period,weekFrom,weekTo):[],[weekly,sel,period,weekFrom,weekTo]);
+  const trendTickInterval=Math.max(0,Math.ceil(trendData.length/15)-1);
   const selLegendData=useMemo(()=>[...sel].map(b=>({brand:b,color:COLORS[BRANDS.indexOf(b)]})),[sel]);
 
   const trendPeak=useMemo(()=>{
@@ -1563,7 +1564,7 @@ function Dashboard({user,onLogout,onAdminClick}){
           <ResponsiveContainer width="100%" height={280}>
             <LineChart data={trendData} margin={{left:10,right:20,top:4,bottom:4}}>
               <CartesianGrid strokeDasharray="3 3" stroke="#EAEAEA"/>
-              <XAxis dataKey="label" tick={{fill:'#6E6E6E',fontSize:11}} axisLine={false} tickLine={false} interval="preserveStartEnd"/>
+              <XAxis dataKey="label" tick={{fill:'#6E6E6E',fontSize:11}} axisLine={false} tickLine={false} interval={trendTickInterval}/>
               <YAxis tickFormatter={v=>metric==='rev'?fmtM(v):fmtK(v)} tick={{fill:'#6E6E6E',fontSize:11}} axisLine={false} tickLine={false}/>
               <Tooltip content={<CustomTooltip metric={metric}/>}/>
               {[...sel].map(b=>(
@@ -1607,7 +1608,7 @@ function Dashboard({user,onLogout,onAdminClick}){
           <ResponsiveContainer width="100%" height={280}>
             <LineChart data={trendData} margin={{left:10,right:20,top:4,bottom:4}}>
               <CartesianGrid strokeDasharray="3 3" stroke="#EAEAEA"/>
-              <XAxis dataKey="label" tick={{fill:'#6E6E6E',fontSize:11}} axisLine={false} tickLine={false} interval="preserveStartEnd"/>
+              <XAxis dataKey="label" tick={{fill:'#6E6E6E',fontSize:11}} axisLine={false} tickLine={false} interval={trendTickInterval}/>
               <YAxis tickFormatter={fmtK} tick={{fill:'#6E6E6E',fontSize:11}} axisLine={false} tickLine={false}/>
               <Tooltip content={<CustomTooltip metric="traffic"/>}/>
               {[...sel].map(b=>(
