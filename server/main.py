@@ -156,10 +156,8 @@ class AdminUserUpdateRequest(BaseModel):
     name: str | None = None
     email: str | None = None
     role: str | None = None
-
-
-class AdminStatusRequest(BaseModel):
-    status: str
+    password: str | None = None
+    status: str | None = None
 
 
 @app.post("/api/auth/signup")
@@ -289,6 +287,18 @@ def admin_update_user(user_id: int, req: AdminUserUpdateRequest, admin: dict = D
             raise HTTPException(400, "잘못된 권한 값입니다.")
         fields.append("role=%s")
         params.append(req.role)
+    if req.password:
+        if len(req.password) < 4:
+            raise HTTPException(400, "비밀번호는 4자 이상이어야 합니다.")
+        fields.append("password_hash=%s")
+        params.append(hash_password(req.password))
+    if req.status is not None:
+        if req.status not in ("active", "inactive"):
+            raise HTTPException(400, "잘못된 상태 값입니다.")
+        fields.append("status_changed_at=CASE WHEN status<>%s THEN now() ELSE status_changed_at END")
+        params.append(req.status)
+        fields.append("status=%s")
+        params.append(req.status)
     if not fields:
         return {"ok": True}
     params.append(user_id)
@@ -296,20 +306,6 @@ def admin_update_user(user_id: int, req: AdminUserUpdateRequest, admin: dict = D
     try:
         with conn.cursor() as cur:
             cur.execute(f"UPDATE users SET {', '.join(fields)} WHERE id=%s", params)
-        conn.commit()
-    finally:
-        conn.close()
-    return {"ok": True}
-
-
-@app.put("/api/admin/users/{user_id}/status")
-def admin_update_status(user_id: int, req: AdminStatusRequest, admin: dict = Depends(require_admin)):
-    if req.status not in ("active", "inactive"):
-        raise HTTPException(400, "잘못된 상태 값입니다.")
-    conn = get_users_conn()
-    try:
-        with conn.cursor() as cur:
-            cur.execute("UPDATE users SET status=%s, status_changed_at=now() WHERE id=%s", (req.status, user_id))
         conn.commit()
     finally:
         conn.close()
