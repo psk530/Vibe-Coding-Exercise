@@ -723,6 +723,11 @@ function AdminScreen({onBack,onLogout}){
 
         {showCreate && (
           <form onSubmit={createUser} autoComplete="off" style={{border:'1px solid var(--c-gray-light)',borderRadius:8,padding:16,marginBottom:20,display:'flex',gap:12,alignItems:'flex-end',flexWrap:'wrap'}}>
+            {/* Decoy fields: Chrome ignores autocomplete="off" on login-shaped forms and
+                fills the first matching text+password inputs it finds, so we give it
+                harmless hidden ones to grab instead of the real 메일주소/비밀번호 fields. */}
+            <input type="text" name="fakeusernameremembered" autoComplete="off" style={{display:'none'}} tabIndex={-1} aria-hidden="true"/>
+            <input type="password" name="fakepasswordremembered" autoComplete="off" style={{display:'none'}} tabIndex={-1} aria-hidden="true"/>
             <div className="bo-field" style={{width:140,margin:0}}><label>이름</label><input autoComplete="off" value={createForm.name} onChange={e=>setCreateForm({...createForm,name:e.target.value})}/></div>
             <div className="bo-field" style={{width:220,margin:0}}><label>메일주소(ID)</label><input autoComplete="off" value={createForm.email} onChange={e=>setCreateForm({...createForm,email:e.target.value})}/></div>
             <div className="bo-field" style={{width:160,margin:0}}><label>비밀번호</label><input type="password" autoComplete="new-password" value={createForm.password} onChange={e=>setCreateForm({...createForm,password:e.target.value})}/></div>
