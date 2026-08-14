@@ -988,6 +988,11 @@ function Dashboard({user,onLogout,onAdminClick}){
     }
   };
 
+  const handleExport=()=>{
+    const params=new URLSearchParams({period,week_from:weekFrom,week_to:weekTo});
+    window.location.href=`/api/export?${params.toString()}`;
+  };
+
   const weekToOptions=useMemo(()=>{
     if(weekFrom==='all') return [];
     return availableWeeks.filter(w=>w>=parseInt(weekFrom));
@@ -1241,6 +1246,7 @@ function Dashboard({user,onLogout,onAdminClick}){
         <div className="header-actions">
           <button className="header-action-btn" onClick={onAdminClick}>{user.role==='admin'?'Admin':'정보변경'}</button>
           <button className="header-action-btn" onClick={onLogout}>Logout</button>
+          <button className="header-action-btn" onClick={handleExport}>Export</button>
         </div>
       </div>
 

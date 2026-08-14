@@ -14,20 +14,23 @@ Run with:
     uvicorn server.main:app --reload --port 8000
 then open http://localhost:8000/
 """
+import io
 import json
 import os
 import re
 import sqlite3
 from pathlib import Path
+from urllib.parse import quote
 
 import bcrypt
 import httpx
 import psycopg2
 import psycopg2.extras
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from openai import OpenAI
+from openpyxl import Workbook
 from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -682,6 +685,51 @@ def top_models(period: str = "all", week_from: str = "all", week_to: str = "all"
         }
         for r in rows
     ]
+
+
+@app.get("/api/export")
+def export_raw_data(period: str = "all", week_from: str = "all", week_to: str = "all", user: dict = Depends(get_current_user)):
+    where_clause, params = period_where(period, week_from, week_to)
+    conn = get_conn()
+    rows = conn.execute(
+        f"""
+        SELECT week_id, brand, rev, units, traffic, organic
+        FROM weekly_sales
+        {where_clause}
+        ORDER BY week_id, brand
+        """,
+        params,
+    ).fetchall()
+    conn.close()
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Raw Data"
+    ws.append(["주차", "브랜드", "매출", "판매수량", "트래픽", "Organic 트래픽"])
+    for r in rows:
+        ws.append([r["week_id"], r["brand"], r["rev"], r["units"], r["traffic"], r["organic"]])
+    for col in ws.columns:
+        width = max(len(str(c.value)) for c in col) + 2
+        ws.column_dimensions[col[0].column_letter].width = width
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    if period == "all":
+        filename = "raw_data_전체.xlsx"
+    elif week_from == "all":
+        filename = f"raw_data_{period}.xlsx"
+    elif week_to == "all" or week_to == week_from:
+        filename = f"raw_data_{period}_{week_from}주차.xlsx"
+    else:
+        filename = f"raw_data_{period}_{week_from}-{week_to}주차.xlsx"
+
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"},
+    )
 
 
 def call_chat_model(client: OpenAI, messages: list):
