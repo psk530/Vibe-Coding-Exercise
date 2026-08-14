@@ -273,6 +273,7 @@ function fmtPeriodLabel(period,weekFrom,weekTo){
 }
 
 function buildTrendData(weekly, selectedBrands, period, weekFrom, weekTo){
+  const byWeek=period!=='all' && weekFrom!=='all';
   const map={};
   for(const row of weekly){
     const {week:wk,brand:b,rev,units,traffic,organic}=row;
@@ -280,8 +281,8 @@ function buildTrendData(weekly, selectedBrands, period, weekFrom, weekTo){
     if(period!=='all' && yr!==parseInt(period)) continue;
     if(period!=='all' && !weekInRange(wk%100,weekFrom,weekTo)) continue;
     if(!selectedBrands.includes(b)) continue;
-    const key=weekToLabel(wk);
-    if(!map[key]) map[key]={label:key,_wk:wk};
+    const key=byWeek?String(wk):weekToLabel(wk);
+    if(!map[key]) map[key]={label:byWeek?`${wk%100}주차`:key,_wk:wk};
     map[key][b]=(map[key][b]||0)+rev;
     map[key][b+'_u']=(map[key][b+'_u']||0)+units;
     map[key][b+'_t']=(map[key][b+'_t']||0)+(traffic||0);
@@ -1551,7 +1552,7 @@ function Dashboard({user,onLogout,onAdminClick}){
           <div className="chart-header">
             <div>
               <div className="chart-title"><span className="num-badge">7</span>주차별 {metric==='rev'?'매출':'판매수량'} 트렌드</div>
-              <div className="chart-subtitle">월별 집계 · 선택 브랜드 비교</div>
+              <div className="chart-subtitle">{period!=='all'&&weekFrom!=='all'?'주별 집계':'월별 집계'} · 선택 브랜드 비교</div>
             </div>
             {trendPeak && (
               <div className="chart-header-insight" style={{flex:1,marginLeft:20}}>
@@ -1589,7 +1590,7 @@ function Dashboard({user,onLogout,onAdminClick}){
           <div className="chart-header">
             <div>
               <div className="chart-title"><span className="num-badge">8</span>주차별 트래픽 트렌드</div>
-              <div className="chart-subtitle">월별 집계 · 선택 브랜드 비교</div>
+              <div className="chart-subtitle">{period!=='all'&&weekFrom!=='all'?'주별 집계':'월별 집계'} · 선택 브랜드 비교</div>
             </div>
             <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:6,flex:1,marginLeft:20}}>
               {trafficTrendPeak && (
