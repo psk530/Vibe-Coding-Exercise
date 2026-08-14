@@ -19,6 +19,7 @@ import json
 import os
 import re
 import sqlite3
+from datetime import datetime
 from pathlib import Path
 from urllib.parse import quote
 
@@ -31,6 +32,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from openai import OpenAI
 from openpyxl import Workbook
+from openpyxl.styles import Alignment, Font
 from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -702,14 +704,39 @@ def export_raw_data(period: str = "all", week_from: str = "all", week_to: str = 
     ).fetchall()
     conn.close()
 
+    if period == "all":
+        period_label = "전체"
+    else:
+        from_label = "전체" if week_from == "all" else f"{week_from}주차"
+        to_label = "전체" if week_to == "all" else f"{week_to}주차"
+        period_label = f"{period}년 {from_label}~{to_label}"
+
     wb = Workbook()
     ws = wb.active
     ws.title = "Raw Data"
-    ws.append(["주차", "브랜드", "매출", "판매수량", "트래픽", "Organic 트래픽"])
-    for r in rows:
-        ws.append([r["week_id"], r["brand"], r["rev"], r["units"], r["traffic"], r["organic"]])
+    bold = Font(bold=True)
+
+    ws.cell(row=1, column=1, value="추출기간").font = bold
+    ws.cell(row=1, column=2, value=period_label)
+    ws.cell(row=2, column=1, value="추출일시").font = bold
+    ws.cell(row=2, column=2, value=datetime.now().strftime("%Y.%m.%d %H:%M"))
+    ws.cell(row=3, column=1, value="추출건수").font = bold
+    ws.cell(row=3, column=2, value=len(rows))
+
+    header_row = 5
+    for col_idx, h in enumerate(["주차", "브랜드", "매출", "판매수량", "트래픽", "Organic 트래픽"], start=1):
+        ws.cell(row=header_row, column=col_idx, value=h).font = bold
+
+    for i, r in enumerate(rows, start=header_row + 1):
+        ws.cell(row=i, column=1, value=r["week_id"]).alignment = Alignment(horizontal="center")
+        ws.cell(row=i, column=2, value=r["brand"]).alignment = Alignment(horizontal="left")
+        for col_idx, key in enumerate(["rev", "units", "traffic", "organic"], start=3):
+            cell = ws.cell(row=i, column=col_idx, value=r[key])
+            cell.alignment = Alignment(horizontal="right")
+            cell.number_format = "#,##0"
+
     for col in ws.columns:
-        width = max(len(str(c.value)) for c in col) + 2
+        width = max((len(str(c.value)) for c in col if c.value is not None), default=8) + 2
         ws.column_dimensions[col[0].column_letter].width = width
 
     buf = io.BytesIO()

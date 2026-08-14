@@ -1244,9 +1244,9 @@ function Dashboard({user,onLogout,onAdminClick}){
           <p>Amazon.com | TV Category | Weekly Data | Week 202401–202605</p>
         </div>
         <div className="header-actions">
+          <button className="header-action-btn" onClick={handleExport}>Export</button>
           <button className="header-action-btn" onClick={onAdminClick}>{user.role==='admin'?'Admin':'정보변경'}</button>
           <button className="header-action-btn" onClick={onLogout}>Logout</button>
-          <button className="header-action-btn" onClick={handleExport}>Export</button>
         </div>
       </div>
 
