@@ -365,7 +365,15 @@ function CorrBadge({r}){
   );
 }
 
-const CHAT_STAGES=['질문을 분석하고 있어요...','대시보드 데이터를 조회하고 있어요...','관련 정보를 검색하고 있어요...','답변을 정리하고 있어요...'];
+const NAVER_SEARCH_TRIGGERS=['최신','동향','트렌드','요즘','최근','뉴스','신제품','출시','프로모션','이벤트','왜','원인','이유'];
+const needsExternalSearch=message=>NAVER_SEARCH_TRIGGERS.some(kw=>message.includes(kw));
+
+function getChatStages(message){
+  const stages=['질문을 분석하고 있어요...','대시보드 데이터를 조회하고 있어요...'];
+  if(needsExternalSearch(message)) stages.push('네이버 뉴스·블로그에서 최신 정보를 검색하고 있어요...');
+  stages.push('LLM으로 답변을 추론하고 있어요...','답변을 정리하고 있어요...');
+  return stages;
+}
 
 const SUGGESTED_QUESTIONS=[
   '브랜드별 매출과 전환율을 표로 비교해줘',
@@ -477,6 +485,7 @@ function ChatPanel({onClose}){
   const [suggestions,setSuggestions]=useState(SUGGESTED_QUESTIONS);
   const bottomRef=useRef(null);
   const stageTimerRef=useRef(null);
+  const stagesRef=useRef(getChatStages(''));
 
   useEffect(()=>{
     bottomRef.current?.scrollIntoView({behavior:'smooth'});
@@ -491,8 +500,9 @@ function ChatPanel({onClose}){
     setInput('');
     setSending(true);
     setStageIdx(0);
+    stagesRef.current=getChatStages(text);
     stageTimerRef.current=setInterval(()=>{
-      setStageIdx(i=>Math.min(i+1,CHAT_STAGES.length-1));
+      setStageIdx(i=>Math.min(i+1,stagesRef.current.length-1));
     },1600);
     fetch('/api/chat',{
       method:'POST',
@@ -544,7 +554,7 @@ function ChatPanel({onClose}){
             {m.role==='assistant'&&m.blocks?<ChatBlocks blocks={m.blocks}/>:m.content}
           </div>
         ))}
-        {sending && <div className="chat-msg pending">{CHAT_STAGES[stageIdx]}</div>}
+        {sending && <div className="chat-msg pending">{stagesRef.current[stageIdx]}</div>}
         <div ref={bottomRef}/>
       </div>
       <div className="chat-suggestions">
