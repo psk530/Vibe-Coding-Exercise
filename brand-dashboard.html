@@ -497,12 +497,18 @@ function ChatPanel({onClose}){
   const bottomRef=useRef(null);
   const stageTimerRef=useRef(null);
   const stagesRef=useRef(getChatStages(''));
+  const pollTimerRef=useRef(null);
+  const mountedRef=useRef(true);
 
   useEffect(()=>{
     bottomRef.current?.scrollIntoView({behavior:'smooth'});
   },[messages,sending,stageIdx]);
 
-  useEffect(()=>()=>clearInterval(stageTimerRef.current),[]);
+  useEffect(()=>()=>{
+    mountedRef.current=false;
+    clearInterval(stageTimerRef.current);
+    clearTimeout(pollTimerRef.current);
+  },[]);
 
   const sendText=(text)=>{
     if(!text||sending) return;
@@ -515,6 +521,21 @@ function ChatPanel({onClose}){
     stageTimerRef.current=setInterval(()=>{
       setStageIdx(i=>Math.min(i+1,stagesRef.current.length-1));
     },1600);
+
+    const finish=()=>{
+      clearInterval(stageTimerRef.current);
+      if(mountedRef.current) setSending(false);
+    };
+    const fail=msg=>{
+      if(!mountedRef.current) return;
+      setMessages(prev=>[...prev,{role:'assistant',content:'답변을 가져오지 못했습니다: '+msg,error:true}]);
+    };
+
+    // The LLM call (plus an optional Naver search) can run well past a single
+    // HTTP request's proxy timeout for complex questions, so /api/chat only
+    // hands back a job id immediately and the real answer is fetched by
+    // polling /api/chat/status -- no single request stays open long enough
+    // to get killed mid-flight.
     fetch('/api/chat',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
@@ -522,16 +543,33 @@ function ChatPanel({onClose}){
     }).then(r=>{
       if(!r.ok) throw new Error('서버 오류 ('+r.status+')');
       return r.json();
-    }).then(data=>{
-      const blocks=Array.isArray(data.blocks)&&data.blocks.length?data.blocks:[{type:'text',content:'답변을 생성하지 못했습니다.'}];
-      setMessages(prev=>[...prev,{role:'assistant',content:flattenBlocks(blocks),blocks}]);
-      if(Array.isArray(data.suggestions)&&data.suggestions.length) setSuggestions(data.suggestions);
-    }).catch(e=>{
-      setMessages(prev=>[...prev,{role:'assistant',content:'답변을 가져오지 못했습니다: '+e.message,error:true}]);
-    }).finally(()=>{
-      clearInterval(stageTimerRef.current);
-      setSending(false);
-    });
+    }).then(({job_id})=>{
+      let attempts=0;
+      const poll=()=>{
+        if(!mountedRef.current) return;
+        attempts++;
+        if(attempts>80){ fail('응답 시간이 너무 오래 걸립니다. 잠시 후 다시 시도해주세요.'); finish(); return; }
+        fetch(`/api/chat/status/${job_id}`).then(async r=>{
+          if(!r.ok){
+            const data=await r.json().catch(()=>({}));
+            throw new Error(data.detail||'서버 오류 ('+r.status+')');
+          }
+          return r.json();
+        }).then(data=>{
+          if(data.status==='pending'){
+            pollTimerRef.current=setTimeout(poll,1500);
+            return;
+          }
+          if(mountedRef.current){
+            const blocks=Array.isArray(data.blocks)&&data.blocks.length?data.blocks:[{type:'text',content:'답변을 생성하지 못했습니다.'}];
+            setMessages(prev=>[...prev,{role:'assistant',content:flattenBlocks(blocks),blocks}]);
+            if(Array.isArray(data.suggestions)&&data.suggestions.length) setSuggestions(data.suggestions);
+          }
+          finish();
+        }).catch(e=>{ fail(e.message); finish(); });
+      };
+      poll();
+    }).catch(e=>{ fail(e.message); finish(); });
   };
 
   const send=()=>sendText(input.trim());

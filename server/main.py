@@ -20,6 +20,9 @@ import json
 import os
 import re
 import sqlite3
+import threading
+import time
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
@@ -861,35 +864,68 @@ def call_chat_model(client: OpenAI, messages: list):
     raise last_err
 
 
+# In-memory job store for /api/chat's async job/poll flow. A single Render
+# free-tier instance runs one worker process, so this is safe; it would need
+# to move to a shared store (Redis/DB) if the service ever scales to multiple
+# instances/workers.
+CHAT_JOBS: dict[str, dict] = {}
+CHAT_JOB_TTL_SECONDS = 600
+
+
+def _prune_chat_jobs():
+    cutoff = time.time() - CHAT_JOB_TTL_SECONDS
+    for job_id in [jid for jid, j in CHAT_JOBS.items() if j["created_at"] < cutoff]:
+        CHAT_JOBS.pop(job_id, None)
+
+
+def _run_chat_job(job_id: str, message: str, history: list[dict]):
+    try:
+        client = get_openrouter_client()
+        system = CHAT_SYSTEM_TEMPLATE.format(data_csv=build_data_csv())
+        messages = [{"role": "system", "content": system}]
+
+        if needs_external_search(message):
+            naver_context = build_naver_context(message)
+            if naver_context:
+                messages.append({
+                    "role": "system",
+                    "content": "다음은 네이버 뉴스/블로그 실시간 검색 결과입니다. 질문과 관련 있는 내용이 있으면 "
+                                "답변의 근거로 활용하고, 해당 블록의 source 필드에 정확한 URL을 넣으세요. 관련 없으면 무시하세요:\n"
+                                + naver_context,
+                })
+
+        messages += history
+        messages.append({"role": "user", "content": message})
+
+        resp = call_chat_model(client, messages)
+        raw = resp.choices[0].message.content
+        blocks, suggestions = parse_chat_response(raw)
+        CHAT_JOBS[job_id].update(status="done", blocks=blocks, suggestions=suggestions)
+    except Exception as e:
+        print(f"chat job error: {e!r}")
+        CHAT_JOBS[job_id].update(status="error", detail="AI 응답 생성 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.")
+
+
 @app.post("/api/chat")
 def chat(req: ChatRequest, user: dict = Depends(get_current_user)):
-    client = get_openrouter_client()
+    _prune_chat_jobs()
+    job_id = uuid.uuid4().hex
+    history = [{"role": m.role, "content": m.content} for m in req.history]
+    CHAT_JOBS[job_id] = {"status": "pending", "user_id": user["id"], "created_at": time.time()}
+    threading.Thread(target=_run_chat_job, args=(job_id, req.message, history), daemon=True).start()
+    return {"job_id": job_id}
 
-    system = CHAT_SYSTEM_TEMPLATE.format(data_csv=build_data_csv())
-    messages = [{"role": "system", "content": system}]
 
-    if needs_external_search(req.message):
-        naver_context = build_naver_context(req.message)
-        if naver_context:
-            messages.append({
-                "role": "system",
-                "content": "다음은 네이버 뉴스/블로그 실시간 검색 결과입니다. 질문과 관련 있는 내용이 있으면 "
-                            "답변의 근거로 활용하고, 해당 블록의 source 필드에 정확한 URL을 넣으세요. 관련 없으면 무시하세요:\n"
-                            + naver_context,
-            })
-
-    messages += [{"role": m.role, "content": m.content} for m in req.history]
-    messages.append({"role": "user", "content": req.message})
-
-    try:
-        resp = call_chat_model(client, messages)
-    except Exception as e:
-        print(f"chat error: {e!r}")
-        raise HTTPException(500, "AI 응답 생성 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.")
-
-    raw = resp.choices[0].message.content
-    blocks, suggestions = parse_chat_response(raw)
-    return {"blocks": blocks, "suggestions": suggestions}
+@app.get("/api/chat/status/{job_id}")
+def chat_status(job_id: str, user: dict = Depends(get_current_user)):
+    job = CHAT_JOBS.get(job_id)
+    if not job or job["user_id"] != user["id"]:
+        raise HTTPException(404, "작업을 찾을 수 없습니다.")
+    if job["status"] == "pending":
+        return {"status": "pending"}
+    if job["status"] == "error":
+        raise HTTPException(500, job["detail"])
+    return {"status": "done", "blocks": job["blocks"], "suggestions": job["suggestions"]}
 
 
 @app.get("/")
