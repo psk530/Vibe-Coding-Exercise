@@ -20,6 +20,7 @@ import json
 import os
 import re
 import sqlite3
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import quote
@@ -75,7 +76,7 @@ def naver_search(query: str, kind: str, display: int = 3) -> list[dict]:
                 "X-NCP-APIGW-API-KEY-ID": client_id,
                 "X-NCP-APIGW-API-KEY": client_secret,
             },
-            timeout=5,
+            timeout=3,
         )
         resp.raise_for_status()
         return resp.json().get("items", [])
@@ -84,7 +85,14 @@ def naver_search(query: str, kind: str, display: int = 3) -> list[dict]:
 
 
 def build_naver_context(message: str) -> str:
-    items = naver_search(message, "news", display=3) + naver_search(message, "blog", display=2)
+    # News and blog are fetched concurrently -- sequential calls could add up to
+    # 2x the per-request timeout on top of the LLM call, and this endpoint was
+    # observed taking ~40s end-to-end (right at the edge of Render/Cloudflare's
+    # proxy timeout, occasionally tipping over into a 502).
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        news_future = pool.submit(naver_search, message, "news", 3)
+        blog_future = pool.submit(naver_search, message, "blog", 2)
+        items = news_future.result() + blog_future.result()
     if not items:
         return ""
     lines = []
