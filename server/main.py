@@ -14,6 +14,7 @@ Run with:
     uvicorn server.main:app --reload --port 8000
 then open http://localhost:8000/
 """
+import html
 import io
 import json
 import os
@@ -48,6 +49,51 @@ app.add_middleware(
 )
 
 CHAT_MODEL = os.environ.get("OPENROUTER_MODEL", "openai/gpt-4o")
+
+NAVER_SEARCH_URL = "https://naverapihub.apigw.ntruss.com/search/v1/{kind}"
+NAVER_SEARCH_TRIGGERS = ["최신", "동향", "트렌드", "요즘", "최근", "뉴스", "신제품", "출시", "프로모션", "이벤트", "왜", "원인", "이유"]
+
+
+def needs_external_search(message: str) -> bool:
+    return any(kw in message for kw in NAVER_SEARCH_TRIGGERS)
+
+
+def _clean_naver_text(s: str) -> str:
+    return html.unescape(re.sub(r"</?b>", "", s or ""))
+
+
+def naver_search(query: str, kind: str, display: int = 3) -> list[dict]:
+    client_id = os.environ.get("NAVER_CLIENT_ID")
+    client_secret = os.environ.get("NAVER_CLIENT_SECRET")
+    if not client_id or not client_secret:
+        return []
+    try:
+        resp = httpx.get(
+            NAVER_SEARCH_URL.format(kind=kind),
+            params={"query": query, "display": display, "sort": "date"},
+            headers={
+                "X-NCP-APIGW-API-KEY-ID": client_id,
+                "X-NCP-APIGW-API-KEY": client_secret,
+            },
+            timeout=5,
+        )
+        resp.raise_for_status()
+        return resp.json().get("items", [])
+    except Exception:
+        return []
+
+
+def build_naver_context(message: str) -> str:
+    items = naver_search(message, "news", display=3) + naver_search(message, "blog", display=2)
+    if not items:
+        return ""
+    lines = []
+    for item in items:
+        title = _clean_naver_text(item.get("title", ""))
+        desc = _clean_naver_text(item.get("description", ""))
+        link = item.get("link", "")
+        lines.append(f"- {title}: {desc} ({link})")
+    return "\n".join(lines)
 
 
 # ---------------------------------------------------------------------------
@@ -795,7 +841,6 @@ def export_raw_data(period: str = "all", week_from: str = "all", week_to: str = 
 
 def call_chat_model(client: OpenAI, messages: list):
     attempts = [
-        dict(model=f"{CHAT_MODEL}:online", messages=messages, response_format={"type": "json_object"}),
         dict(model=CHAT_MODEL, messages=messages, response_format={"type": "json_object"}),
         dict(model=CHAT_MODEL, messages=messages),
     ]
@@ -814,6 +859,17 @@ def chat(req: ChatRequest, user: dict = Depends(get_current_user)):
 
     system = CHAT_SYSTEM_TEMPLATE.format(data_csv=build_data_csv())
     messages = [{"role": "system", "content": system}]
+
+    if needs_external_search(req.message):
+        naver_context = build_naver_context(req.message)
+        if naver_context:
+            messages.append({
+                "role": "system",
+                "content": "다음은 네이버 뉴스/블로그 실시간 검색 결과입니다. 질문과 관련 있는 내용이 있으면 "
+                            "답변의 근거로 활용하고, 해당 블록의 source 필드에 정확한 URL을 넣으세요. 관련 없으면 무시하세요:\n"
+                            + naver_context,
+            })
+
     messages += [{"role": m.role, "content": m.content} for m in req.history]
     messages.append({"role": "user", "content": req.message})
 
