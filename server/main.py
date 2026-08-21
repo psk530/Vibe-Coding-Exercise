@@ -56,9 +56,36 @@ CHAT_MODEL = os.environ.get("OPENROUTER_MODEL", "openai/gpt-4o")
 NAVER_SEARCH_URL = "https://naverapihub.apigw.ntruss.com/search/v1/{kind}"
 NAVER_SEARCH_TRIGGERS = ["최신", "동향", "트렌드", "요즘", "최근", "뉴스", "신제품", "출시", "프로모션", "이벤트", "왜", "원인", "이유"]
 
+# Korean and English spellings that can appear in a user's message, mapped to
+# one canonical label per brand for building a short Naver search query.
+BRAND_ALIASES = {
+    "삼성": "삼성", "Samsung": "삼성",
+    "엘지": "LG", "LG": "LG",
+    "소니": "Sony", "Sony": "Sony",
+    "TCL": "TCL",
+    "인시그니아": "Insignia", "Insignia": "Insignia",
+    "하이센스": "HiSense", "HiSense": "HiSense",
+    "아마존": "Amazon", "Amazon": "Amazon",
+    "로쿠": "Roku", "Roku": "Roku",
+    "비지오": "Vizio", "Vizio": "Vizio",
+    "도시바": "Toshiba", "Toshiba": "Toshiba",
+}
+
 
 def needs_external_search(message: str) -> bool:
     return any(kw in message for kw in NAVER_SEARCH_TRIGGERS)
+
+
+def build_naver_query(message: str) -> str:
+    # Naver's search API matches short keyword phrases, not full sentences --
+    # a whole conversational question passed through verbatim came back with
+    # zero results even for an on-topic query. Pull out the brand(s) actually
+    # mentioned (in either script) and search for those instead.
+    brands = []
+    for alias, canonical in BRAND_ALIASES.items():
+        if alias in message and canonical not in brands:
+            brands.append(canonical)
+    return " ".join(brands + ["TV"]) if brands else "TV " + message[:20]
 
 
 def _clean_naver_text(s: str) -> str:
@@ -87,13 +114,14 @@ def naver_search(query: str, kind: str, display: int = 3) -> list[dict]:
 
 
 def build_naver_context(message: str) -> str:
+    query = build_naver_query(message)
     # News and blog are fetched concurrently -- sequential calls could add up to
     # 2x the per-request timeout on top of the LLM call, and this endpoint was
     # observed taking ~40s end-to-end (right at the edge of Render/Cloudflare's
     # proxy timeout, occasionally tipping over into a 502).
     with ThreadPoolExecutor(max_workers=2) as pool:
-        news_future = pool.submit(naver_search, message, "news", 3)
-        blog_future = pool.submit(naver_search, message, "blog", 2)
+        news_future = pool.submit(naver_search, query, "news", 3)
+        blog_future = pool.submit(naver_search, query, "blog", 2)
         items = news_future.result() + blog_future.result()
     if not items:
         return ""
@@ -426,7 +454,10 @@ week 컬럼은 YYYYWW 형식입니다 (예: 202520 = 2025년 20주차). conv(전
 블록 작성 규칙:
 1. 매출/트래픽/판매량/전환율 등 데이터에서 직접 확인 가능한 수치는 CSV를 근거로 정확히 계산해서 답하세요.
 2. "왜 ~했는지", "원인이 뭐야" 같은 질문에는 먼저 CSV 데이터 안에서 근거(전후 주차 대비 변화, 다른 브랜드와의 비교, 계절성 등)를 찾아 분석하고,
-   검색으로 얻은 최신 뉴스/기사(신제품 출시, 프로모션, 이벤트, 시즌 세일 등)가 있다면 근거로 함께 활용하세요.
+   이번 대화에 네이버 뉴스/블로그 검색 결과가 시스템 메시지로 실제로 제공된 경우에만 그 내용을 근거로 함께 활용하세요.
+   검색 결과가 제공되지 않았다면 "CNBC", "로이터", "OO 매체에 따르면"처럼 특정 매체나 기사를 인용하는 것처럼 쓰지 마세요 —
+   실제로 검색하지 않았는데 검색한 것처럼 꾸며내면 안 됩니다. 이 경우엔 CSV 데이터 안에서만 근거를 찾고,
+   외부 요인에 대한 추측은 "~한 프로모션이 있었을 것으로 추정됩니다"처럼 추측임을 분명히 밝히고 source는 null로 두세요.
    URL이나 도메인 이름(예: example.com)은 content 문자열 안에 절대 직접 쓰지 마세요 — "[텍스트](URL)" 마크다운 링크 문법도 금지입니다.
    출처는 "OO 매체에 따르면"처럼 자연스러운 문장으로만 언급하고, 실제 URL은 반드시 아래 8번 규칙대로 source 필드에만 넣으세요.
 3. 여러 주차나 여러 브랜드에 걸친 수치 비교/추이는 text로 나열하지 말고 table 또는 chart 블록으로 표현해서 가독성을 높이세요.
