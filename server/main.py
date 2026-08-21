@@ -21,7 +21,6 @@ import os
 import re
 import sqlite3
 import threading
-import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
@@ -144,6 +143,19 @@ def init_users_table():
                         status TEXT NOT NULL DEFAULT 'active',
                         created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
                         status_changed_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                    )
+                    """
+                )
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS chat_jobs (
+                        id TEXT PRIMARY KEY,
+                        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                        status TEXT NOT NULL DEFAULT 'pending',
+                        blocks JSONB,
+                        suggestions JSONB,
+                        detail TEXT,
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
                     )
                     """
                 )
@@ -864,18 +876,19 @@ def call_chat_model(client: OpenAI, messages: list):
     raise last_err
 
 
-# In-memory job store for /api/chat's async job/poll flow. A single Render
-# free-tier instance runs one worker process, so this is safe; it would need
-# to move to a shared store (Redis/DB) if the service ever scales to multiple
-# instances/workers.
-CHAT_JOBS: dict[str, dict] = {}
+# Chat jobs live in the chat_jobs Postgres table (same Supabase DB as users),
+# not in-memory -- so the async job/poll flow works correctly no matter how
+# many Render instances/workers end up serving requests. Each write opens its
+# own short-lived connection (matching every other DB access in this file);
+# the background thread only holds one at the very start and very end of a
+# job, never while the LLM call itself is in flight.
 CHAT_JOB_TTL_SECONDS = 600
 
 
-def _prune_chat_jobs():
-    cutoff = time.time() - CHAT_JOB_TTL_SECONDS
-    for job_id in [jid for jid, j in CHAT_JOBS.items() if j["created_at"] < cutoff]:
-        CHAT_JOBS.pop(job_id, None)
+def _prune_chat_jobs(conn):
+    with conn.cursor() as cur:
+        cur.execute("DELETE FROM chat_jobs WHERE created_at < now() - interval '%s seconds'", (CHAT_JOB_TTL_SECONDS,))
+    conn.commit()
 
 
 def _run_chat_job(job_id: str, message: str, history: list[dict]):
@@ -900,26 +913,62 @@ def _run_chat_job(job_id: str, message: str, history: list[dict]):
         resp = call_chat_model(client, messages)
         raw = resp.choices[0].message.content
         blocks, suggestions = parse_chat_response(raw)
-        CHAT_JOBS[job_id].update(status="done", blocks=blocks, suggestions=suggestions)
+        conn = get_users_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE chat_jobs SET status='done', blocks=%s, suggestions=%s WHERE id=%s",
+                    (psycopg2.extras.Json(blocks), psycopg2.extras.Json(suggestions), job_id),
+                )
+            conn.commit()
+        finally:
+            conn.close()
     except Exception as e:
         print(f"chat job error: {e!r}")
-        CHAT_JOBS[job_id].update(status="error", detail="AI 응답 생성 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.")
+        try:
+            conn = get_users_conn()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "UPDATE chat_jobs SET status='error', detail=%s WHERE id=%s",
+                        ("AI 응답 생성 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.", job_id),
+                    )
+                conn.commit()
+            finally:
+                conn.close()
+        except Exception as e2:
+            print(f"chat job error (and failed to record it): {e2!r}")
 
 
 @app.post("/api/chat")
 def chat(req: ChatRequest, user: dict = Depends(get_current_user)):
-    _prune_chat_jobs()
     job_id = uuid.uuid4().hex
     history = [{"role": m.role, "content": m.content} for m in req.history]
-    CHAT_JOBS[job_id] = {"status": "pending", "user_id": user["id"], "created_at": time.time()}
+    conn = get_users_conn()
+    try:
+        _prune_chat_jobs(conn)
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO chat_jobs (id, user_id, status) VALUES (%s, %s, 'pending')",
+                (job_id, user["id"]),
+            )
+        conn.commit()
+    finally:
+        conn.close()
     threading.Thread(target=_run_chat_job, args=(job_id, req.message, history), daemon=True).start()
     return {"job_id": job_id}
 
 
 @app.get("/api/chat/status/{job_id}")
 def chat_status(job_id: str, user: dict = Depends(get_current_user)):
-    job = CHAT_JOBS.get(job_id)
-    if not job or job["user_id"] != user["id"]:
+    conn = get_users_conn()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT * FROM chat_jobs WHERE id=%s AND user_id=%s", (job_id, user["id"]))
+            job = cur.fetchone()
+    finally:
+        conn.close()
+    if not job:
         raise HTTPException(404, "작업을 찾을 수 없습니다.")
     if job["status"] == "pending":
         return {"status": "pending"}
